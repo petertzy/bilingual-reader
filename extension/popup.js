@@ -14,6 +14,11 @@ const modelList = document.getElementById('model-list');
 const status = document.getElementById('status');
 let modelsByProvider = { ollama: 'gemma3:4b', deeplocal: '', openai: 'gpt-4.1-mini' };
 
+const storageReady = Promise.all([
+  chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
+  chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
+]);
+
 function validLocalBaseUrl(raw) {
   const url = new URL(raw.trim());
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' ||
@@ -49,6 +54,7 @@ function toggleProvider() {
 }
 
 async function savePreferences() {
+  await storageReady;
   modelsByProvider[providerInput.value] = modelInput.value.trim();
   const values = {
     provider: providerInput.value,
@@ -64,7 +70,7 @@ async function savePreferences() {
   await chrome.storage.local.set(values);
 }
 
-chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'openAiApiKey', 'rememberOpenAiKey', 'deepLocalBaseUrl', 'model', 'target'], prefs => {
+storageReady.then(() => chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'openAiApiKey', 'rememberOpenAiKey', 'deepLocalBaseUrl', 'model', 'target'])).then(prefs => {
   modelsByProvider = {
     ollama: prefs.ollamaModel || prefs.model || 'gemma3:4b',
     deeplocal: prefs.deepLocalModel || '',
@@ -76,7 +82,7 @@ chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiMo
   if (rememberKeyInput.checked) apiKeyInput.value = prefs.openAiApiKey || '';
   if (['en', 'de', 'fr', 'es'].includes(prefs.target)) targetInput.value = prefs.target;
   toggleProvider();
-});
+}).catch(error => { status.textContent = `Unable to secure key storage: ${error.message}`; });
 
 providerInput.addEventListener('change', async () => {
   toggleProvider();
@@ -122,9 +128,14 @@ async function send(type) {
     }
     if (options) {
       if (options.provider === 'openai') {
-        if (!options.apiKey) throw new Error('Enter your OpenAI API key.');
         // OpenAI access is declared in the manifest; the provider remains opt-in.
-        await chrome.storage.session.set({ openAiApiKey: options.apiKey });
+        await storageReady;
+        if (options.apiKey) {
+          await chrome.storage.session.set({ openAiApiKey: options.apiKey });
+        } else {
+          const stored = await chrome.storage.session.get('openAiApiKey');
+          if (!stored.openAiApiKey) throw new Error('Enter your OpenAI API key.');
+        }
       }
       await savePreferences();
     }
@@ -145,6 +156,22 @@ async function send(type) {
     document.getElementById('settings-toggle').setAttribute('aria-expanded', 'true');
   }
 }
+
+document.getElementById('forget-api-key').addEventListener('click', async () => {
+  try {
+    await storageReady;
+    await Promise.all([
+      chrome.storage.local.remove('openAiApiKey'),
+      chrome.storage.session.remove('openAiApiKey')
+    ]);
+    apiKeyInput.value = '';
+    rememberKeyInput.checked = false;
+    await chrome.storage.local.set({ rememberOpenAiKey: false });
+    status.textContent = 'OpenAI API key forgotten on this device.';
+  } catch (error) {
+    status.textContent = `Unable to forget API key: ${error.message}`;
+  }
+});
 
 document.getElementById('settings-toggle').addEventListener('click', () => {
   const advanced = document.getElementById('advanced');

@@ -6,6 +6,12 @@ const OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const MAX_INPUT = 3500;
 const LANGUAGES = Object.freeze({ en: 'English', de: 'German', fr: 'French', es: 'Spanish' });
 
+// Restrict stored credentials before handling any translation requests.
+const secureStorageReady = Promise.all([
+  chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
+  chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
+]);
+
 function validateLocalBaseUrl(raw) {
   if (typeof raw !== 'string' || raw.length > 180) throw new Error('Invalid deepLocal address.');
   let url;
@@ -103,8 +109,17 @@ async function translate(message) {
       : { model, stream: false, messages };
   const headers = { 'Content-Type': 'application/json' };
   if (provider === 'openai') {
+    await secureStorageReady;
     const session = await chrome.storage.session.get('openAiApiKey');
-    headers.Authorization = `Bearer ${validateOpenAiApiKey(session.openAiApiKey)}`;
+    let key = session.openAiApiKey;
+    if (!key) {
+      const saved = await chrome.storage.local.get(['openAiApiKey', 'rememberOpenAiKey']);
+      if (saved.rememberOpenAiKey && saved.openAiApiKey) {
+        key = validateOpenAiApiKey(saved.openAiApiKey);
+        await chrome.storage.session.set({ openAiApiKey: key });
+      }
+    }
+    headers.Authorization = `Bearer ${validateOpenAiApiKey(key)}`;
   }
   const result = await fetchJson(endpoint, {
     method: 'POST',
@@ -120,6 +135,27 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message?.type === 'GET_BACKEND_INFO') {
     respond({ ok: true, version: chrome.runtime.getManifest().version, providers: ['ollama', 'deeplocal', 'openai'] });
     return false;
+  }
+  if (message?.type === 'GET_TRANSLATION_PREFS') {
+    if (!sender.tab?.id) {
+      respond({ ok: false, error: 'This action is only available from a webpage.' });
+      return false;
+    }
+    (async () => {
+      await secureStorageReady;
+      const prefs = await chrome.storage.local.get([
+        'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
+      ]);
+      const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
+      return {
+        provider,
+        model: provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : prefs.ollamaModel,
+        target: prefs.target || 'en',
+        deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
+      };
+    })().then(settings => respond({ ok: true, settings }))
+      .catch(() => respond({ ok: false, error: 'Unable to load translation preferences.' }));
+    return true;
   }
   if (message?.type !== 'TRANSLATE' && message?.type !== 'LIST_MODELS') return false;
   if (message.type === 'TRANSLATE' && !sender.tab?.id) {

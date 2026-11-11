@@ -178,17 +178,11 @@
     translateButton.addEventListener('click', async () => {
       panel.hidden = true;
       try {
-        const prefs = await chrome.storage.local.get([
-          'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
-        ]);
-        const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
-        const model = provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : prefs.ollamaModel;
-        if (!model) throw new Error('Choose a model in extension settings.');
+        const response = await chrome.runtime.sendMessage({ type: 'GET_TRANSLATION_PREFS' });
+        if (!response?.ok) throw new Error(response?.error || 'Unable to load translation preferences.');
+        if (!response.settings?.model) throw new Error('Choose a model in extension settings.');
         clear();
-        await translate({
-          provider, model, target: prefs.target || 'en',
-          deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
-        });
+        await translate(response.settings);
       } catch (error) {
         hint.textContent = String(error.message || error).slice(0, 160);
         panel.hidden = false;
