@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sovereign Bilingual Reader</title>
+  <style>
+    body{font:14px system-ui,sans-serif;width:318px;margin:18px;color:#18212f}
+    h1{font-size:18px;margin:0 0 8px}p{line-height:1.5;color:#526174}
+    label{display:block;margin:12px 0 4px}input,select,button{box-sizing:border-box;width:100%;padding:9px;border-radius:7px;border:1px solid #b7c0cd;font:inherit}
+    button{margin-top:10px;cursor:pointer;background:#205ad7;color:white;border:0}
+    button.secondary{background:#e9edf4;color:#263248}
+    button:disabled{opacity:.55;cursor:wait}
+    #status{min-height:2.5em;font-size:12px;white-space:pre-wrap}
+    .note{font-size:12px}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+  <h1>Sovereign Bilingual Reader</h1>
+  <p>Local-only translation. This extension never connects to cloud translation APIs.</p>
+  <label for="provider">Local model service</label>
+  <select id="provider"><option value="ollama">Ollama</option><option value="deeplocal">deepLocal</option></select>
+  <div id="deeplocal-settings" hidden>
+    <label for="deeplocal-url">deepLocal API base URL</label>
+    <input id="deeplocal-url" value="http://127.0.0.1:14567/v1" spellcheck="false" autocomplete="off">
+    <p class="note">Packaged deepLocal apps use a dynamic port. Copy the URL from the Server page.</p>
+  </div>
+  <label for="model">Loaded model ID</label>
+  <input id="model" list="model-list" value="gemma3:4b" spellcheck="false" autocomplete="off">
+  <datalist id="model-list"></datalist>
+  <button class="secondary" id="discover">Find local models</button>
+  <label for="target">Target language</label>
+  <select id="target">
+    <option value="en">English</option><option value="de">German</option>
+    <option value="fr">French</option><option value="es">Spanish</option>
+  </select>
+  <button id="start">Translate current page (up to 35 blocks)</button>
+  <button class="secondary" id="clear">Remove translations</button>
+  <p id="status" role="status"></p>
+  <script src="popup.js"></script>
+</body>
+</html>

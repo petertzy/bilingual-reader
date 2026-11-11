@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Sovereign Bilingual Reader",
+  "version": "0.2.0",
+  "description": "On-demand bilingual page translation via local Ollama or deepLocal.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*"
+  ],
+  "action": {
+    "default_title": "Sovereign Bilingual Reader",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
