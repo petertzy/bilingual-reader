@@ -117,3 +117,7 @@ The vault unlock form uses standard `username` and `current-password` autocomple
 ## Saving a key separately from translation
 
 In Settings > OpenAI, enter a new API key, check **Remember encrypted key on this device**, enter a Vault passphrase of at least 12 characters, then click **Save encrypted API key**. The popup confirms when the encrypted key is saved. Reopening the popup intentionally leaves the API key input empty; the credential status indicates whether an encrypted key exists and whether it is unlocked for this session. Click **Unlock saved API key** with the passphrase after restarting the browser. **Translate page** no longer silently creates or overwrites the persistent encrypted credential; saving is an explicit action. The **Forget API Key** button removes saved and session credentials.
+
+## Deleting OpenAI credentials
+
+In Settings > OpenAI, select **Delete saved and active API key** to remove the encrypted credential, legacy plaintext credential, remember preference, and unlocked session key. The extension reads back both storage areas and confirms deletion only if no credential remains. Unchecking **Remember encrypted key on this device** also revokes both saved and active credentials. Browser profile backups and external password manager entries are not affected; revoke the key in your OpenAI account to invalidate it everywhere.

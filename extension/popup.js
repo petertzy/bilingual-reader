@@ -14,6 +14,7 @@ const discoverButton = document.getElementById('discover');
 const modelList = document.getElementById('model-list');
 const status = document.getElementById('status');
 const credentialStatus = document.getElementById('credential-status');
+const forgetKeyButton = document.getElementById('forget-api-key');
 let credentialOperation = Promise.resolve();
 function queueCredentialOperation(action) {
   const operation = credentialOperation.then(action);
@@ -30,6 +31,25 @@ async function refreshCredentialStatus() {
     ? session.openAiApiKey ? 'Encrypted key saved and unlocked for this session.' : 'Encrypted key saved. Unlock it to translate.'
     : session.openAiApiKey ? 'Key available for this session only. Not saved for future sessions.' : 'No API key saved.';
 }
+async function deleteCredentials() {
+  await storageReady;
+  await Promise.all([
+    chrome.storage.local.remove(['openAiApiKey', 'encryptedOpenAiApiKey', 'rememberOpenAiKey']),
+    chrome.storage.session.remove('openAiApiKey')
+  ]);
+  const [local, session] = await Promise.all([
+    chrome.storage.local.get(['openAiApiKey', 'encryptedOpenAiApiKey', 'rememberOpenAiKey']),
+    chrome.storage.session.get('openAiApiKey')
+  ]);
+  if (local.openAiApiKey || local.encryptedOpenAiApiKey || local.rememberOpenAiKey || session.openAiApiKey) {
+    throw new Error('Credential deletion could not be verified.');
+  }
+  apiKeyInput.value = '';
+  vaultPassphraseInput.value = '';
+  rememberKeyInput.checked = false;
+  await refreshCredentialStatus();
+}
+
 async function saveEncryptedKey() {
   await storageReady;
   const key = apiKeyInput.value.trim();
@@ -173,17 +193,19 @@ providerInput.addEventListener('change', async () => {
 });
 modelInput.addEventListener('change', () => { savePreferences().catch(() => {}); });
 rememberKeyInput.addEventListener('change', async () => {
+  if (rememberKeyInput.checked) {
+    savePreferences().catch(error => { status.textContent = `Unable to update key storage: ${error.message}`; });
+    return;
+  }
+  forgetKeyButton.disabled = true;
   try {
-    await credentialOperation;
-    if (!rememberKeyInput.checked) {
-      await storageReady;
-      await chrome.storage.local.remove(['encryptedOpenAiApiKey', 'openAiApiKey']);
-      vaultPassphraseInput.value = '';
-      status.textContent = 'Saved credential removed. Session access remains available.';
-    }
-    await savePreferences();
-    await refreshCredentialStatus();
-  } catch (error) { status.textContent = `Unable to update key storage: ${error.message}`; }
+    await queueCredentialOperation(deleteCredentials);
+    status.textContent = 'Saved and active API keys deleted and verified.';
+  } catch (error) {
+    status.textContent = `Unable to delete API key: ${error.message}`;
+  } finally {
+    forgetKeyButton.disabled = false;
+  }
 });
 
 document.getElementById('discover').addEventListener('click', async () => {
@@ -275,22 +297,15 @@ document.getElementById('vault-unlock-form').addEventListener('submit', async ev
   } catch (error) { status.textContent = `Unable to unlock key: ${error.message}`; }
 });
 
-document.getElementById('forget-api-key').addEventListener('click', async () => {
+forgetKeyButton.addEventListener('click', async () => {
+  forgetKeyButton.disabled = true;
   try {
-    await credentialOperation;
-    await storageReady;
-    await Promise.all([
-      chrome.storage.local.remove(['openAiApiKey', 'encryptedOpenAiApiKey']),
-      chrome.storage.session.remove('openAiApiKey')
-    ]);
-    apiKeyInput.value = '';
-    vaultPassphraseInput.value = '';
-    rememberKeyInput.checked = false;
-    await chrome.storage.local.set({ rememberOpenAiKey: false });
-    status.textContent = 'OpenAI API key forgotten on this device.';
-    await refreshCredentialStatus();
+    await queueCredentialOperation(deleteCredentials);
+    status.textContent = 'Saved and active API keys deleted and verified.';
   } catch (error) {
-    status.textContent = `Unable to forget API key: ${error.message}`;
+    status.textContent = `Unable to delete API key: ${error.message}`;
+  } finally {
+    forgetKeyButton.disabled = false;
   }
 });
 
