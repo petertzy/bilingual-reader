@@ -182,7 +182,7 @@ storageReady.then(async () => {
   providerInput.value = ['deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
   rememberKeyInput.checked = Boolean(prefs.encryptedOpenAiApiKey);
   apiKeyInput.value = '';
-  if (['en', 'de', 'fr', 'es'].includes(prefs.target)) targetInput.value = prefs.target;
+  if (Array.from(targetInput.options).some(option => option.value === prefs.target)) targetInput.value = prefs.target;
   toggleProvider();
   return refreshCredentialStatus();
 }).catch(error => { status.textContent = `Unable to secure key storage: ${error.message}`; });
