@@ -16,29 +16,45 @@
   const structuralText = 'p, li, h1, h2, h3, h4, h5, h6, [role="heading"]';
   const uiExcluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"],[role="button"],[role="toolbar"],[role="menu"],[role="menubar"],[role="tablist"],[role="textbox"],[aria-hidden="true"]';
 
+  function directText(el) {
+    return Array.from(el.childNodes || [])
+      .filter(node => node.nodeType === 3)
+      .map(node => node.textContent || '')
+      .join(' ').replace(/\\s+/g, ' ').trim();
+  }
+
+  function sourceText(el) {
+    const own = directText(el);
+    if (own.length >= 25) return own;
+    // Structural text can contain inline formatting without being a wrapper.
+    if (el.matches(structuralText)) return el.innerText?.trim() || '';
+    // Plain chat bubbles often wrap the prompt in nested spans. Accept the
+    // innermost non-interactive container with text, not the Copy toolbar.
+    if (Array.from(el.children).some(child => child.innerText?.trim())) return '';
+    return el.innerText?.trim() || '';
+  }
+
   function candidates() {
     return Array.from(document.querySelectorAll(textSelector))
       .filter(el => {
         if (el.closest(uiExcluded) || el.hasAttribute(MARK) || el.closest(`[${MARK}]`)) return false;
+        if (el.closest('#sovereign-reader-quick-tab')) return false;
         if (!el.getClientRects().length) return false;
-        const text = el.innerText?.trim();
+        const text = sourceText(el);
         if (!text || text.length < 25 || text.length > MAX_CHARS) return false;
         if (!el.matches(structuralText)) {
-          // Chat prompts may be leaf divs or spans outside semantic landmarks.
-          // Skip interactive wrappers and parent containers with visible child text.
-          // A prompt may share a bubble with a Copy button. Translate the
-          // container only when its own direct text is substantial.
-          const ownText = Array.from(el.childNodes || [])
-            .filter(node => node.nodeType === 3)
-            .map(node => node.textContent || '').join(' ').trim();
-          const hasTextChildren = Array.from(el.children).some(child => child.innerText?.trim());
-          if (hasTextChildren && ownText.length < 25) return false;
-          if (hasTextChildren && ownText.length >= 25 &&
-              Array.from(el.children).some(child => !child.matches('button, [role="button"], svg, img, [aria-hidden="true"]') && child.innerText?.trim())) return false;
+          const childWithText = Array.from(el.children).some(child =>
+            child.innerText?.trim() && !child.matches('button, [role="button"], svg, img, [aria-hidden="true"]'));
+          if (childWithText && directText(el).length < 25) return false;
         }
         return true;
       })
-      .filter((el, _, all) => !all.some(other => other !== el && el.contains(other)))
+      .filter((el, _, all) => !all.some(other => other !== el && el.contains(other) && !directText(el)))
+      .sort((a, b) => {
+        const ay = Math.abs(a.getBoundingClientRect().top - window.innerHeight * 0.35);
+        const by = Math.abs(b.getBoundingClientRect().top - window.innerHeight * 0.35);
+        return ay - by;
+      })
       .slice(0, MAX_BLOCKS);
   }
 
@@ -81,11 +97,7 @@
       });
       if (!blocks.length) return;
       for (const original of blocks) {
-        const ownText = !original.matches(structuralText)
-          ? Array.from(original.childNodes || []).filter(node => node.nodeType === 3)
-              .map(node => node.textContent || '').join(' ').trim()
-          : '';
-        const segments = splitText(ownText.length >= 25 ? ownText : original.innerText.trim());
+        const segments = splitText(sourceText(original));
         if (!segments.length) continue;
         original.setAttribute(MARK, 'original');
         const wrapper = translationNode('');
