@@ -118,8 +118,7 @@ async function send(type) {
       if (options.provider === 'openai') {
         if (!options.apiKey) throw new Error('Enter your OpenAI API key.');
         // OpenAI access is declared in the manifest; the provider remains opt-in.
-        const stored = await chrome.runtime.sendMessage({ type: 'SET_API_KEY', apiKey: options.apiKey });
-        if (!stored?.ok) throw new Error(stored?.error || 'Unable to configure OpenAI API key.');
+        await chrome.storage.session.set({ openAiApiKey: options.apiKey });
       }
       await savePreferences();
     }
