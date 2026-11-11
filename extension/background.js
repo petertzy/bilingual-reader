@@ -6,6 +6,12 @@ const OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const MAX_INPUT = 3500;
 const LANGUAGES = Object.freeze({ en: 'English', de: 'German', fr: 'French', es: 'Spanish' });
 
+// Restrict stored credentials before handling any translation requests.
+const secureStorageReady = Promise.all([
+  chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
+  chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
+]);
+
 function validateLocalBaseUrl(raw) {
   if (typeof raw !== 'string' || raw.length > 180) throw new Error('Invalid deepLocal address.');
   let url;
@@ -103,8 +109,17 @@ async function translate(message) {
       : { model, stream: false, messages };
   const headers = { 'Content-Type': 'application/json' };
   if (provider === 'openai') {
+    await secureStorageReady;
     const session = await chrome.storage.session.get('openAiApiKey');
-    headers.Authorization = `Bearer ${validateOpenAiApiKey(session.openAiApiKey)}`;
+    let key = session.openAiApiKey;
+    if (!key) {
+      const saved = await chrome.storage.local.get(['openAiApiKey', 'rememberOpenAiKey']);
+      if (saved.rememberOpenAiKey && saved.openAiApiKey) {
+        key = validateOpenAiApiKey(saved.openAiApiKey);
+        await chrome.storage.session.set({ openAiApiKey: key });
+      }
+    }
+    headers.Authorization = `Bearer ${validateOpenAiApiKey(key)}`;
   }
   const result = await fetchJson(endpoint, {
     method: 'POST',
