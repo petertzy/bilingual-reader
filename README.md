@@ -63,7 +63,7 @@ Cloud translation is never automatic fallback. The OpenAI API key is not bundled
 
 ## Supported languages
 
-The current target-language selector offers English, German, French, and Spanish. The extension code, UI, comments, configuration, tests, and documentation are English-only. It does not bundle Chinese-language resources or China-hosted translation services.
+The target-language selector supports 36 options, including English, Chinese (Simplified), Chinese (Traditional), Spanish, French, German, Portuguese, Italian, Russian, Japanese, Korean, Arabic, Hindi, Bengali, Urdu, Indonesian, Malay, Vietnamese, Thai, Turkish, Dutch, Polish, Ukrainian, Persian, Swahili, Tamil, Telugu, Hebrew, Greek, Swedish, Danish, Finnish, Norwegian, Czech, Romanian, and Hungarian. All language labels, code, UI, comments, configuration, tests, and documentation remain English-only. Chinese is offered as a translation output target; no Chinese-language resources or China-hosted translation services are bundled. Actual translation quality and script support depend on the selected model.
 
 ## Limitations
 
