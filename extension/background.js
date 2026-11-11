@@ -111,15 +111,8 @@ async function translate(message) {
   if (provider === 'openai') {
     await secureStorageReady;
     const session = await chrome.storage.session.get('openAiApiKey');
-    let key = session.openAiApiKey;
-    if (!key) {
-      const saved = await chrome.storage.local.get(['openAiApiKey', 'rememberOpenAiKey']);
-      if (saved.rememberOpenAiKey && saved.openAiApiKey) {
-        key = validateOpenAiApiKey(saved.openAiApiKey);
-        await chrome.storage.session.set({ openAiApiKey: key });
-      }
-    }
-    headers.Authorization = `Bearer ${validateOpenAiApiKey(key)}`;
+    // Persistent credentials are encrypted and must be unlocked in the popup.
+    headers.Authorization = `Bearer ${validateOpenAiApiKey(session.openAiApiKey)}`;
   }
   const result = await fetchJson(endpoint, {
     method: 'POST',
