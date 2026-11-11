@@ -38,7 +38,7 @@ function createWorker(responder) {
   return {
     calls,
     setSessionKey(key) { sessionValues.openAiApiKey = key; },
-    setRememberedKey(key) { localValues.openAiApiKey = key; localValues.rememberOpenAiKey = true; },
+    setRememberedKey(key) { localValues.encryptedOpenAiApiKey = { ciphertext: key }; localValues.rememberOpenAiKey = true; },
     setLocalPreferences(values) { Object.assign(localValues, values); },
     accessLevels,
     message(request, fromTab = true) {
@@ -173,12 +173,12 @@ test('storage is restricted to trusted extension contexts on startup', async () 
   ]);
 });
 
-test('remembered OpenAI key is restored only after storage restrictions are set', async () => {
+test('encrypted persistent OpenAI key cannot be used without session unlock', async () => {
   const worker = createWorker(() => ({ choices: [{ message: { content: 'Hello' } }] }));
   worker.setRememberedKey('sk-remembered');
   const result = await worker.message({ type: 'TRANSLATE', provider: 'openai', model: 'gpt-4.1-mini', target: 'en', text: 'Hallo' });
-  assert.equal(result.ok, true);
-  assert.equal(worker.calls[0].options.headers.Authorization, 'Bearer sk-remembered');
+  assert.equal(result.ok, false);
+  assert.equal(worker.calls.length, 0);
 });
 
 test('quick tab receives preferences but never receives saved credentials', async () => {
