@@ -74,7 +74,7 @@ test('skips toolbar content, hidden text, and wrapper duplicates', () => {
 
 test('includes leaf chat prompts outside main and excludes interactive wrappers', () => {
   const prompt = element({ text: 'What is a surprising fact about your city?', tag: 'SPAN', parent: 'outside-main' });
-  const interactive = element({ text: 'What is a surprising fact about your city? Copy', parent: 'interactive' });
+  const interactive = element({ text: 'Copy the selected text into the clipboard', tag: 'BUTTON', parent: 'excluded' });
   assert.deepEqual(selectCandidates([prompt, interactive]), [prompt]);
 });
 
