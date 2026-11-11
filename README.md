@@ -91,3 +91,7 @@ MIT. Original standalone starter code, not derived from BiRead or FluentRead.
 ## Progressive translation
 
 Version 0.4.0 splits eligible page paragraphs into short sentence-sized translation jobs. Results appear next to their source paragraph as each request finishes. OpenAI uses up to three concurrent requests, and local backends use up to two. The extension processes up to 35 visible blocks and 120 sentence jobs per run. A progress indicator shows completed jobs and failures. Removing translations invalidates pending results, so they cannot reappear afterward. Translation speed depends on the selected model and network conditions; multiple OpenAI requests may incur usage charges and rate limits.
+
+## Error reporting and viewport priority (v0.4.1)
+
+Translation requests start with paragraphs closest to the reading viewport. OpenAI concurrency is capped at two requests. Errors from the translation API now display their HTTP status and a truncated provider message in the page progress banner; authentication, model access, invalid-request and rate-limit errors stop the remaining queue. A run is only marked complete when jobs have finished; failures are counted separately. Never share API keys or full authorization headers when reporting errors.
