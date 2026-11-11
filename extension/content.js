@@ -20,7 +20,7 @@
     return Array.from(el.childNodes || [])
       .filter(node => node.nodeType === 3)
       .map(node => node.textContent || '')
-      .join(' ').replace(/\\s+/g, ' ').trim();
+      .join(' ').replace(/\s+/g, ' ').trim();
   }
 
   function sourceText(el) {
