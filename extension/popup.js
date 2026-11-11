@@ -13,6 +13,38 @@ const vaultPassphraseInput = document.getElementById('vault-passphrase');
 const discoverButton = document.getElementById('discover');
 const modelList = document.getElementById('model-list');
 const status = document.getElementById('status');
+const credentialStatus = document.getElementById('credential-status');
+let credentialOperation = Promise.resolve();
+function queueCredentialOperation(action) {
+  const operation = credentialOperation.then(action);
+  credentialOperation = operation.catch(() => {});
+  return operation;
+}
+async function refreshCredentialStatus() {
+  await storageReady;
+  const [saved, session] = await Promise.all([
+    chrome.storage.local.get('encryptedOpenAiApiKey'),
+    chrome.storage.session.get('openAiApiKey')
+  ]);
+  credentialStatus.textContent = saved.encryptedOpenAiApiKey
+    ? session.openAiApiKey ? 'Encrypted key saved and unlocked for this session.' : 'Encrypted key saved. Unlock it to translate.'
+    : session.openAiApiKey ? 'Key available for this session only. Not saved for future sessions.' : 'No API key saved.';
+}
+async function saveEncryptedKey() {
+  await storageReady;
+  const key = apiKeyInput.value.trim();
+  if (!key || key.length > 512 || /[\u0000-\u0020\u007f]/.test(key)) throw new Error('Enter a valid OpenAI API key first.');
+  if (!rememberKeyInput.checked) throw new Error('Enable Remember encrypted key first.');
+  const encrypted = await encryptCredential(key, vaultPassphraseInput.value);
+  await chrome.storage.local.set({ encryptedOpenAiApiKey: encrypted, rememberOpenAiKey: true });
+  await chrome.storage.local.remove('openAiApiKey');
+  await chrome.storage.session.set({ openAiApiKey: key });
+  apiKeyInput.value = '';
+  vaultPassphraseInput.value = '';
+  await refreshCredentialStatus();
+  status.textContent = 'API key encrypted and saved. It is ready to use.';
+}
+
 let modelsByProvider = { ollama: 'gemma3:4b', deeplocal: '', openai: 'gpt-4.1-mini' };
 
 const storageReady = Promise.all([
@@ -132,6 +164,7 @@ storageReady.then(async () => {
   apiKeyInput.value = '';
   if (['en', 'de', 'fr', 'es'].includes(prefs.target)) targetInput.value = prefs.target;
   toggleProvider();
+  return refreshCredentialStatus();
 }).catch(error => { status.textContent = `Unable to secure key storage: ${error.message}`; });
 
 providerInput.addEventListener('change', async () => {
@@ -141,6 +174,7 @@ providerInput.addEventListener('change', async () => {
 modelInput.addEventListener('change', () => { savePreferences().catch(() => {}); });
 rememberKeyInput.addEventListener('change', async () => {
   try {
+    await credentialOperation;
     if (!rememberKeyInput.checked) {
       await storageReady;
       await chrome.storage.local.remove(['encryptedOpenAiApiKey', 'openAiApiKey']);
@@ -148,6 +182,7 @@ rememberKeyInput.addEventListener('change', async () => {
       status.textContent = 'Saved credential removed. Session access remains available.';
     }
     await savePreferences();
+    await refreshCredentialStatus();
   } catch (error) { status.textContent = `Unable to update key storage: ${error.message}`; }
 });
 
@@ -189,6 +224,7 @@ async function send(type) {
     if (options) {
       if (options.provider === 'openai') {
         // OpenAI access is declared in the manifest; the provider remains opt-in.
+        await credentialOperation;
         await storageReady;
         if (options.apiKey) {
           await chrome.storage.session.set({ openAiApiKey: options.apiKey });
@@ -196,12 +232,6 @@ async function send(type) {
           const stored = await chrome.storage.session.get('openAiApiKey');
           if (!stored.openAiApiKey) throw new Error('Enter your OpenAI API key.');
         }
-      }
-      if (options.provider === 'openai' && rememberKeyInput.checked && options.apiKey) {
-        const passphrase = vaultPassphraseInput.value;
-        const encrypted = await encryptCredential(options.apiKey, passphrase);
-        await chrome.storage.local.set({ encryptedOpenAiApiKey: encrypted });
-        vaultPassphraseInput.value = '';
       }
       await savePreferences();
     }
@@ -223,9 +253,16 @@ async function send(type) {
   }
 }
 
+document.getElementById('save-api-key').addEventListener('click', () => {
+  queueCredentialOperation(saveEncryptedKey).catch(error => {
+    status.textContent = `Unable to save API key: ${error.message}`;
+  });
+});
+
 document.getElementById('vault-unlock-form').addEventListener('submit', async event => {
   event.preventDefault();
   try {
+    await credentialOperation;
     await storageReady;
     const { encryptedOpenAiApiKey } = await chrome.storage.local.get('encryptedOpenAiApiKey');
     if (!encryptedOpenAiApiKey) throw new Error('No encrypted API key is saved.');
@@ -234,11 +271,13 @@ document.getElementById('vault-unlock-form').addEventListener('submit', async ev
     apiKeyInput.value = '';
     vaultPassphraseInput.value = '';
     status.textContent = 'API key unlocked for this browser session.';
+    await refreshCredentialStatus();
   } catch (error) { status.textContent = `Unable to unlock key: ${error.message}`; }
 });
 
 document.getElementById('forget-api-key').addEventListener('click', async () => {
   try {
+    await credentialOperation;
     await storageReady;
     await Promise.all([
       chrome.storage.local.remove(['openAiApiKey', 'encryptedOpenAiApiKey']),
@@ -249,6 +288,7 @@ document.getElementById('forget-api-key').addEventListener('click', async () => 
     rememberKeyInput.checked = false;
     await chrome.storage.local.set({ rememberOpenAiKey: false });
     status.textContent = 'OpenAI API key forgotten on this device.';
+    await refreshCredentialStatus();
   } catch (error) {
     status.textContent = `Unable to forget API key: ${error.message}`;
   }
