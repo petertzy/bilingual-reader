@@ -11,7 +11,7 @@ const script = fs.readFileSync(path.join(__dirname, '../extension/content.js'), 
 function selectCandidates(elements) {
   const document = {
     querySelectorAll(selector) {
-      return selector.includes('main div') ? elements : [];
+      return selector.includes('div, span') ? elements : [];
     },
     getElementById() { return {}; }
   };
@@ -29,10 +29,11 @@ function selectCandidates(elements) {
   return Array.from(context.__selectCandidates());
 }
 
-function element({ text, tag = 'DIV', parent = '', children = [], visible = true }) {
+function element({ text, tag = 'DIV', parent = '', children = [], visible = true, directText = null }) {
   return {
     innerText: text,
     children,
+    childNodes: [{ nodeType: 3, textContent: directText === null ? (children.length ? '' : text) : directText }],
     querySelector(selector) { return parent === 'interactive' && selector.includes('button') ? {} : null; },
     getClientRects() { return visible ? [{}] : []; },
     closest(selector) {
@@ -68,4 +69,10 @@ test('includes leaf chat prompts outside main and excludes interactive wrappers'
   const prompt = element({ text: 'What is a surprising fact about your city?', tag: 'SPAN', parent: 'outside-main' });
   const interactive = element({ text: 'What is a surprising fact about your city? Copy', parent: 'interactive' });
   assert.deepEqual(selectCandidates([prompt, interactive]), [prompt]);
+});
+
+test('includes chat bubble text when a Copy button is a sibling', () => {
+  const copy = element({ text: 'Copy', tag: 'BUTTON' });
+  const bubble = element({ text: "What's a surprising fact about your city? Copy", children: [copy], directText: "What's a surprising fact about your city?" });
+  assert.deepEqual(selectCandidates([bubble]), [bubble]);
 });
