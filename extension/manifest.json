@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Sovereign Bilingual Reader",
-  "version": "0.2.0",
-  "description": "On-demand bilingual page translation via local Ollama or deepLocal.",
+  "version": "0.3.0",
+  "description": "On-demand bilingual page translation with local Ollama, deepLocal, or optional OpenAI.",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "permissions"
   ],
   "host_permissions": [
     "http://127.0.0.1/*"
@@ -20,5 +21,8 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
-  }
+  },
+  "optional_host_permissions": [
+    "https://api.openai.com/*"
+  ]
 }
