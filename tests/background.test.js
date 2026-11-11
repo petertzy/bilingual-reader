@@ -28,6 +28,7 @@ function createWorker(responder) {
   vm.runInNewContext(script, context, { filename: 'background.js' });
   return {
     calls,
+    setSessionKey(key) { sessionValues.openAiApiKey = key; },
     message(request, fromTab = true) {
       return new Promise(resolve => {
         const isAsync = handler(request, fromTab ? { tab: { id: 1 } } : {}, resolve);
@@ -121,8 +122,7 @@ test('OpenAI uses fixed HTTPS endpoint, Bearer token, and no local document retr
   const result = await worker.message({type:'TRANSLATE',provider:'openai',model:'gpt-4.1-mini',target:'en',text:'Hallo'});
   assert.equal(result.ok,false);
   assert.equal(worker.calls.length,0);
-  const configured = await worker.message({type:'SET_API_KEY',apiKey:'sk-test'},false);
-  assert.equal(configured.ok,true);
+  await worker.setSessionKey('sk-test');
   const translated = await worker.message({type:'TRANSLATE',provider:'openai',model:'gpt-4.1-mini',target:'en',text:'Hallo'});
   assert.equal(translated.ok,true);
   assert.equal(worker.calls[0].url,'https://api.openai.com/v1/chat/completions');
@@ -150,6 +150,6 @@ test('OpenAI model discovery is disabled without contacting its API', async () =
 test('content scripts cannot set or overwrite OpenAI API credentials', async () => {
   const worker=createWorker(() => ({}));
   const result=await worker.message({type:'SET_API_KEY',apiKey:'sk-injected'},true);
-  assert.equal(result.ok,false);
+  assert.equal(result,null);
   assert.equal(worker.calls.length,0);
 });
