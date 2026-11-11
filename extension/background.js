@@ -110,22 +110,6 @@ async function translate(message) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message?.type === 'SET_API_KEY') {
-    if (sender.tab) {
-      respond({ ok: false, error: 'API keys can only be configured in the extension popup.' });
-      return false;
-    }
-    try {
-      const key = validateOpenAiApiKey(message.apiKey);
-      chrome.storage.session.set({ openAiApiKey: key })
-        .then(() => respond({ ok: true }))
-        .catch(() => respond({ ok: false, error: 'Unable to store the API key for this browser session.' }));
-    } catch (error) {
-      respond({ ok: false, error: String(error.message || error) });
-      return false;
-    }
-    return true;
-  }
   if (message?.type !== 'TRANSLATE' && message?.type !== 'LIST_MODELS') return false;
   if (message.type === 'TRANSLATE' && !sender.tab?.id) {
     respond({ ok: false, error: 'Translation is only available from an active webpage.' });
