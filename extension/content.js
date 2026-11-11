@@ -11,13 +11,27 @@
   const state = { running: false, generation: 0 };
   const excluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"]';
 
+  // Include headings and text-only chat bubbles without translating controls or containers twice.
+  const textSelector = 'p, li, h1, h2, h3, h4, h5, h6, [role="heading"], main div, article div, [role="main"] div, [data-message-author-role] div';
+  const structuralText = 'p, li, h1, h2, h3, h4, h5, h6, [role="heading"]';
+  const uiExcluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"],[role="button"],[role="toolbar"],[role="menu"],[role="menubar"],[role="tablist"],[role="textbox"],[aria-hidden="true"]';
+
   function candidates() {
-    return Array.from(document.querySelectorAll('main p, article p, main li, article li, p'))
-      .filter(el => !el.closest(excluded) && !el.hasAttribute(MARK) && !el.closest(`[${MARK}]`))
+    return Array.from(document.querySelectorAll(textSelector))
       .filter(el => {
+        if (el.closest(uiExcluded) || el.hasAttribute(MARK) || el.closest(`[${MARK}]`)) return false;
+        if (!el.getClientRects().length) return false;
         const text = el.innerText?.trim();
-        return text && text.length >= 25 && text.length <= MAX_CHARS && el.getClientRects().length > 0;
+        if (!text || text.length < 25 || text.length > MAX_CHARS) return false;
+        if (!el.matches(structuralText)) {
+          // A chat bubble may use plain div elements; only translate the innermost
+          // text container to avoid capturing whole messages or toolbars.
+          if (Array.from(el.children).some(child => child.innerText?.trim())) return false;
+          if (!el.closest('main, article, [role="main"], [data-message-author-role]')) return false;
+        }
+        return true;
       })
+      .filter((el, _, all) => !all.some(other => other !== el && el.contains(other)))
       .slice(0, MAX_BLOCKS);
   }
 
