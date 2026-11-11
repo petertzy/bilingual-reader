@@ -13,7 +13,6 @@ const discoverButton = document.getElementById('discover');
 const modelList = document.getElementById('model-list');
 const status = document.getElementById('status');
 let modelsByProvider = { ollama: 'gemma3:4b', deeplocal: '', openai: 'gpt-4.1-mini' };
-let openAiPermissionGranted = false;
 
 function validLocalBaseUrl(raw) {
   const url = new URL(raw.trim());
@@ -120,13 +119,19 @@ async function send(type) {
         if (!options.apiKey) throw new Error('Enter your OpenAI API key.');
         const granted = await chrome.permissions.request({ origins: ['https://api.openai.com/*'] });
         if (!granted) throw new Error('OpenAI network permission was not granted.');
+        const stored = await chrome.runtime.sendMessage({ type: 'SET_API_KEY', apiKey: options.apiKey });
+        if (!stored?.ok) throw new Error(stored?.error || 'Unable to configure OpenAI API key.');
       }
       await savePreferences();
     }
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) throw new Error('Open a normal website before using translation.');
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-    const result = await chrome.tabs.sendMessage(tab.id, { type, ...options });
+    const pageOptions = options ? {
+      provider: options.provider, model: options.model, target: options.target,
+      deepLocalBaseUrl: options.deepLocalBaseUrl
+    } : {};
+    const result = await chrome.tabs.sendMessage(tab.id, { type, ...pageOptions });
     if (!result?.ok) throw new Error('The webpage did not respond.');
     status.textContent = type === 'START'
       ? (options.provider === 'openai' ? 'OpenAI translation started. Selected page text is sent to api.openai.com.' : 'Local translation started. Translations will appear gradually.')
