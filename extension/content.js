@@ -26,8 +26,15 @@
         if (!el.matches(structuralText)) {
           // Chat prompts may be leaf divs or spans outside semantic landmarks.
           // Skip interactive wrappers and parent containers with visible child text.
-          if (el.querySelector('button, input, textarea, select, a, [role="button"], [contenteditable]')) return false;
-          if (Array.from(el.children).some(child => child.innerText?.trim())) return false;
+          // A prompt may share a bubble with a Copy button. Translate the
+          // container only when its own direct text is substantial.
+          const ownText = Array.from(el.childNodes || [])
+            .filter(node => node.nodeType === 3)
+            .map(node => node.textContent || '').join(' ').trim();
+          const hasTextChildren = Array.from(el.children).some(child => child.innerText?.trim());
+          if (hasTextChildren && ownText.length < 25) return false;
+          if (hasTextChildren && ownText.length >= 25 &&
+              Array.from(el.children).some(child => !child.matches('button, [role="button"], svg, img, [aria-hidden="true"]') && child.innerText?.trim())) return false;
         }
         return true;
       })
@@ -74,7 +81,11 @@
       });
       if (!blocks.length) return;
       for (const original of blocks) {
-        const segments = splitText(original.innerText.trim());
+        const ownText = !original.matches(structuralText)
+          ? Array.from(original.childNodes || []).filter(node => node.nodeType === 3)
+              .map(node => node.textContent || '').join(' ').trim()
+          : '';
+        const segments = splitText(ownText.length >= 25 ? ownText : original.innerText.trim());
         if (!segments.length) continue;
         original.setAttribute(MARK, 'original');
         const wrapper = translationNode('');
@@ -191,6 +202,11 @@
     tab.addEventListener('click', () => { panel.hidden = !panel.hidden; });
     translateButton.addEventListener('click', async () => {
       panel.hidden = true;
+      if (!chrome.runtime?.id) {
+        hint.textContent = 'Extension was updated. Refresh this page to reconnect the translation controls.';
+        panel.hidden = false;
+        return;
+      }
       try {
         const response = await chrome.runtime.sendMessage({ type: 'GET_TRANSLATION_PREFS' });
         if (!response?.ok) throw new Error(response?.error || 'Unable to load translation preferences.');
@@ -198,11 +214,21 @@
         clear();
         await translate(response.settings);
       } catch (error) {
-        hint.textContent = String(error.message || error).slice(0, 160);
+        const reason = String(error.message || error);
+        hint.textContent = /Extension context invalidated/i.test(reason)
+          ? 'Extension was updated. Refresh this page to reconnect the translation controls.'
+          : reason.slice(0, 160);
         panel.hidden = false;
       }
     });
-    removeButton.addEventListener('click', () => { clear(); panel.hidden = true; });
+    removeButton.addEventListener('click', () => {
+      if (!chrome.runtime?.id) {
+        hint.textContent = 'Extension was updated. Refresh this page to reconnect the translation controls.';
+        panel.hidden = false;
+        return;
+      }
+      clear(); panel.hidden = true;
+    });
     document.documentElement.append(host);
   }
 
