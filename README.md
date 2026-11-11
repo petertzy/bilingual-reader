@@ -97,3 +97,7 @@ Version 0.4.0 splits eligible page paragraphs into short sentence-sized translat
 ## Error reporting and viewport priority (v0.4.1)
 
 Translation requests start with paragraphs closest to the reading viewport. OpenAI concurrency is capped at two requests. Errors from the translation API now display their HTTP status and a truncated provider message in the page progress banner; authentication, model access, invalid-request and rate-limit errors stop the remaining queue. A run is only marked complete when jobs have finished; failures are counted separately. Never share API keys or full authorization headers when reporting errors.
+
+## Compact reading controls (v0.5.0)
+
+The extension popup now opens in compact mode, with advanced provider settings behind the **Settings** button. Clicking **Translate page** closes the popup while translations continue asynchronously. Opening the extension action on an ordinary webpage also injects a small **T** tab at the right edge; its mini-panel provides **Translate page** and **Remove translations** actions using saved provider preferences. Successful translations no longer display progress or completion banners inside the webpage. Translation errors remain visible beside the affected text. The floating tab is installed only after the user invokes the extension, not on every visited website.
