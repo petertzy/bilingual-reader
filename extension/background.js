@@ -117,6 +117,10 @@ async function translate(message) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message?.type === 'GET_BACKEND_INFO') {
+    respond({ ok: true, version: chrome.runtime.getManifest().version, providers: ['ollama', 'deeplocal', 'openai'] });
+    return false;
+  }
   if (message?.type !== 'TRANSLATE' && message?.type !== 'LIST_MODELS') return false;
   if (message.type === 'TRANSLATE' && !sender.tab?.id) {
     respond({ ok: false, error: 'Translation is only available from an active webpage.' });
