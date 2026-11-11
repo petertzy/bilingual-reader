@@ -36,6 +36,7 @@ function element({ text, tag = 'DIV', parent = '', children = [], visible = true
     childNodes: [{ nodeType: 3, textContent: directText === null ? (children.length ? '' : text) : directText }],
     querySelector(selector) { return parent === 'interactive' && selector.includes('button') ? {} : null; },
     getClientRects() { return visible ? [{}] : []; },
+    getBoundingClientRect() { return { top: 100 }; },
     closest(selector) {
       if (selector.includes('script,style')) return parent === 'excluded' ? this : null;
       if (selector.includes('data-sovereign-bilingual')) return null;
@@ -76,4 +77,17 @@ test('includes chat bubble text when a Copy button is a sibling', () => {
   const copy = element({ text: 'Copy', tag: 'BUTTON' });
   const bubble = element({ text: "What's a surprising fact about your city? Copy", children: [copy], directText: "What's a surprising fact about your city?" });
   assert.deepEqual(selectCandidates([bubble]), [bubble]);
+});
+
+test('selects a direct-text question bubble with nested Copy control', () => {
+  const copy = element({ text: 'Copy', tag: 'BUTTON' });
+  const prompt = element({ text: "What's a surprising fact about your city? Copy", children: [copy], directText: "What's a surprising fact about your city?" });
+  assert.deepEqual(selectCandidates([prompt]), [prompt]);
+});
+
+test('does not let earlier offscreen candidates consume the visible block limit', () => {
+  const offscreen = Array.from({ length: 40 }, (_, i) => element({ text: 'An unrelated paragraph of sufficient length ' + i }));
+  offscreen.forEach(item => { item.getBoundingClientRect = () => ({ top: 12000 }); });
+  const prompt = element({ text: "What's a surprising fact about your city?" });
+  assert.ok(selectCandidates([...offscreen, prompt]).includes(prompt));
 });
