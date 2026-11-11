@@ -39,6 +39,7 @@ function createWorker(responder) {
     calls,
     setSessionKey(key) { sessionValues.openAiApiKey = key; },
     setRememberedKey(key) { localValues.openAiApiKey = key; localValues.rememberOpenAiKey = true; },
+    setLocalPreferences(values) { Object.assign(localValues, values); },
     accessLevels,
     message(request, fromTab = true) {
       return new Promise(resolve => {
@@ -178,4 +179,15 @@ test('remembered OpenAI key is restored only after storage restrictions are set'
   const result = await worker.message({ type: 'TRANSLATE', provider: 'openai', model: 'gpt-4.1-mini', target: 'en', text: 'Hallo' });
   assert.equal(result.ok, true);
   assert.equal(worker.calls[0].options.headers.Authorization, 'Bearer sk-remembered');
+});
+
+test('quick tab receives preferences but never receives saved credentials', async () => {
+  const worker = createWorker(() => ({}));
+  worker.setRememberedKey('sk-private');
+  worker.setLocalPreferences({ provider: 'openai', openAiModel: 'gpt-4.1-mini', target: 'de' });
+  const result = await worker.message({ type: 'GET_TRANSLATION_PREFS' });
+  assert.equal(result.ok, true);
+  assert.equal(result.settings.provider, 'openai');
+  assert.equal(result.settings.model, 'gpt-4.1-mini');
+  assert.equal(JSON.stringify(result).includes('sk-private'), false);
 });
