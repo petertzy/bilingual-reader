@@ -136,6 +136,27 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     respond({ ok: true, version: chrome.runtime.getManifest().version, providers: ['ollama', 'deeplocal', 'openai'] });
     return false;
   }
+  if (message?.type === 'GET_TRANSLATION_PREFS') {
+    if (!sender.tab?.id) {
+      respond({ ok: false, error: 'This action is only available from a webpage.' });
+      return false;
+    }
+    (async () => {
+      await secureStorageReady;
+      const prefs = await chrome.storage.local.get([
+        'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
+      ]);
+      const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
+      return {
+        provider,
+        model: provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : prefs.ollamaModel,
+        target: prefs.target || 'en',
+        deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
+      };
+    })().then(settings => respond({ ok: true, settings }))
+      .catch(() => respond({ ok: false, error: 'Unable to load translation preferences.' }));
+    return true;
+  }
   if (message?.type !== 'TRANSLATE' && message?.type !== 'LIST_MODELS') return false;
   if (message.type === 'TRANSLATE' && !sender.tab?.id) {
     respond({ ok: false, error: 'Translation is only available from an active webpage.' });
