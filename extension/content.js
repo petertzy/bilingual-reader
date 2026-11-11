@@ -46,16 +46,12 @@
     return el;
   }
 
-  function updateProgress(progress, completed, total, failed) {
-    progress.textContent = `Translation progress: ${completed}/${total} sentences${failed ? ` · ${failed} failed` : ''}`;
-  }
 
   async function translate(options) {
     if (state.running) return;
     const generation = ++state.generation;
     state.running = true;
     const tasks = [];
-    let progress = null;
     try {
       const blocks = candidates().sort((a, b) => {
         const ay = Math.abs(a.getBoundingClientRect().top - window.innerHeight * 0.35);
@@ -63,9 +59,6 @@
         return ay - by;
       });
       if (!blocks.length) return;
-      progress = translationNode('Preparing translation...');
-      progress.setAttribute(MARK, 'progress');
-      blocks[0].insertAdjacentElement('beforebegin', progress);
       for (const original of blocks) {
         const segments = splitText(original.innerText.trim());
         if (!segments.length) continue;
@@ -92,7 +85,6 @@
       let failed = 0;
       let fatalError = '';
       let succeeded = 0;
-      updateProgress(progress, 0, total, 0);
       const concurrency = options.provider === 'openai' ? 2 : 2;
       async function worker() {
         while (generation === state.generation && !fatalError) {
@@ -124,19 +116,11 @@
           } finally {
             if (generation === state.generation) {
               completed++;
-              if (progress?.isConnected) updateProgress(progress, completed, total, failed);
             }
           }
         }
       }
       await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
-      if (generation === state.generation && progress?.isConnected) {
-        if (fatalError) {
-          progress.textContent = `Translation stopped: ${succeeded} succeeded, ${failed} failed. ${fatalError}`;
-        } else {
-          progress.textContent = `Translation complete: ${succeeded}/${total} sentences succeeded${failed ? ` · ${failed} failed` : ''}`;
-        }
-      }
     } finally {
       if (generation === state.generation) state.running = false;
     }
@@ -148,6 +132,73 @@
     document.querySelectorAll(`[${MARK}="translation"], [${MARK}="progress"]`).forEach(el => el.remove());
     document.querySelectorAll(`[${MARK}="original"]`).forEach(el => el.removeAttribute(MARK));
   }
+
+
+  // A small, user-controlled tab provides translation without a persistent settings window.
+  function installQuickTab() {
+    if (document.getElementById('sovereign-reader-quick-tab')) return;
+    const host = document.createElement('div');
+    host.id = 'sovereign-reader-quick-tab';
+    host.style.cssText = 'position:fixed;right:0;top:42%;z-index:2147483647;';
+    const root = host.attachShadow({ mode: 'closed' });
+    const style = document.createElement('style');
+    style.textContent = `
+      button { font: 13px system-ui,sans-serif; cursor:pointer; }
+      .tab { border:0;border-radius:8px 0 0 8px;background:#205ad7;color:white;padding:11px 9px;box-shadow:0 2px 10px #0003; }
+      .panel { position:absolute;right:38px;top:0;width:190px;padding:12px;background:white;color:#18212f;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 6px 22px #0003;font:13px system-ui,sans-serif; }
+      .panel[hidden] { display:none; }
+      .panel button { width:100%;margin-top:8px;border:0;border-radius:6px;padding:9px;background:#205ad7;color:white; }
+      .panel button.secondary { background:#edf1f7;color:#18212f; }
+      .hint { margin-top:8px;font-size:11px;color:#596579; }
+    `;
+    const tab = document.createElement('button');
+    tab.className = 'tab';
+    tab.type = 'button';
+    tab.textContent = 'T';
+    tab.title = 'Bilingual translation';
+    tab.setAttribute('aria-label', 'Open bilingual translation controls');
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.hidden = true;
+    const title = document.createElement('strong');
+    title.textContent = 'Bilingual Reader';
+    const translateButton = document.createElement('button');
+    translateButton.type = 'button';
+    translateButton.textContent = 'Translate page';
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'secondary';
+    removeButton.textContent = 'Remove translations';
+    const hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = 'Choose provider and language in extension settings.';
+    panel.append(title, translateButton, removeButton, hint);
+    root.append(style, tab, panel);
+    tab.addEventListener('click', () => { panel.hidden = !panel.hidden; });
+    translateButton.addEventListener('click', async () => {
+      panel.hidden = true;
+      try {
+        const prefs = await chrome.storage.local.get([
+          'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
+        ]);
+        const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
+        const model = provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : prefs.ollamaModel;
+        if (!model) throw new Error('Choose a model in extension settings.');
+        clear();
+        await translate({
+          provider, model, target: prefs.target || 'en',
+          deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
+        });
+      } catch (error) {
+        hint.textContent = String(error.message || error).slice(0, 160);
+        panel.hidden = false;
+      }
+    });
+    removeButton.addEventListener('click', () => { clear(); panel.hidden = true; });
+    document.documentElement.append(host);
+  }
+
+  installQuickTab();
 
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (message?.type === 'START') {
