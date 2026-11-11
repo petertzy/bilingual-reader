@@ -41,8 +41,8 @@
       } catch (err) {
         errors++;
         el.removeAttribute(MARK);
-        console.warn('[Sovereign Bilingual] Local translation failed:', err.message);
-        if (String(err.message).includes('Local service') || String(err.message).includes('Failed to fetch') || String(err.message).includes('timed out')) break;
+        console.warn('[Sovereign Bilingual] Translation failed:', err.message);
+        if (String(err.message).includes('Translation service') || String(err.message).includes('Failed to fetch') || String(err.message).includes('timed out')) break;
       }
     }
     state.running = false;

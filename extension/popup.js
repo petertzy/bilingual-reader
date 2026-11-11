@@ -6,9 +6,13 @@ const modelInput = document.getElementById('model');
 const targetInput = document.getElementById('target');
 const deepLocalInput = document.getElementById('deeplocal-url');
 const deepLocalSettings = document.getElementById('deeplocal-settings');
+const openAiSettings = document.getElementById('openai-settings');
+const apiKeyInput = document.getElementById('openai-api-key');
+const rememberKeyInput = document.getElementById('remember-openai-key');
+const discoverButton = document.getElementById('discover');
 const modelList = document.getElementById('model-list');
 const status = document.getElementById('status');
-let modelsByProvider = { ollama: 'gemma3:4b', deeplocal: '' };
+let modelsByProvider = { ollama: 'gemma3:4b', deeplocal: '', openai: 'gpt-4.1-mini' };
 
 function validLocalBaseUrl(raw) {
   const url = new URL(raw.trim());
@@ -28,37 +32,48 @@ function settings() {
   }
   return {
     provider, model, target: targetInput.value,
-    deepLocalBaseUrl: provider === 'deeplocal' ? validLocalBaseUrl(deepLocalInput.value) : undefined
+    deepLocalBaseUrl: provider === 'deeplocal' ? validLocalBaseUrl(deepLocalInput.value) : undefined,
+    apiKey: provider === 'openai' ? apiKeyInput.value.trim() : undefined
   };
 }
 
 function toggleProvider() {
   const provider = providerInput.value;
   deepLocalSettings.hidden = provider !== 'deeplocal';
+  openAiSettings.hidden = provider !== 'openai';
+  discoverButton.hidden = provider === 'openai';
   modelInput.value = modelsByProvider[provider] || '';
-  modelInput.placeholder = provider === 'deeplocal' ? 'Find or paste a loaded model ID' : 'gemma3:4b';
+  modelInput.placeholder = provider === 'deeplocal' ? 'Find or paste a loaded model ID' : provider === 'openai' ? 'gpt-4.1-mini' : 'gemma3:4b';
   modelList.replaceChildren();
   status.textContent = '';
 }
 
 async function savePreferences() {
   modelsByProvider[providerInput.value] = modelInput.value.trim();
-  await chrome.storage.local.set({
+  const values = {
     provider: providerInput.value,
     ollamaModel: modelsByProvider.ollama,
     deepLocalModel: modelsByProvider.deeplocal,
     deepLocalBaseUrl: deepLocalInput.value.trim(),
+    openAiModel: modelsByProvider.openai,
+    rememberOpenAiKey: rememberKeyInput.checked,
     target: targetInput.value
-  });
+  };
+  if (rememberKeyInput.checked) values.openAiApiKey = apiKeyInput.value.trim();
+  else await chrome.storage.local.remove('openAiApiKey');
+  await chrome.storage.local.set(values);
 }
 
-chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'deepLocalBaseUrl', 'model', 'target'], prefs => {
+chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'openAiApiKey', 'rememberOpenAiKey', 'deepLocalBaseUrl', 'model', 'target'], prefs => {
   modelsByProvider = {
     ollama: prefs.ollamaModel || prefs.model || 'gemma3:4b',
-    deeplocal: prefs.deepLocalModel || ''
+    deeplocal: prefs.deepLocalModel || '',
+    openai: prefs.openAiModel || 'gpt-4.1-mini'
   };
   deepLocalInput.value = prefs.deepLocalBaseUrl || DEFAULT_DEEPLOCAL_BASE_URL;
-  providerInput.value = prefs.provider === 'deeplocal' ? 'deeplocal' : 'ollama';
+  providerInput.value = ['deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
+  rememberKeyInput.checked = Boolean(prefs.rememberOpenAiKey);
+  if (rememberKeyInput.checked) apiKeyInput.value = prefs.openAiApiKey || '';
   if (['en', 'de', 'fr', 'es'].includes(prefs.target)) targetInput.value = prefs.target;
   toggleProvider();
 });
@@ -68,6 +83,7 @@ providerInput.addEventListener('change', async () => {
   await savePreferences();
 });
 modelInput.addEventListener('change', () => { savePreferences().catch(() => {}); });
+rememberKeyInput.addEventListener('change', () => { savePreferences().catch(() => {}); });
 
 document.getElementById('discover').addEventListener('click', async () => {
   status.textContent = 'Contacting local model service...';
@@ -98,14 +114,27 @@ async function send(type) {
   status.textContent = '';
   try {
     const options = type === 'START' ? settings() : null;
-    if (options) await savePreferences();
+    if (options) {
+      if (options.provider === 'openai') {
+        if (!options.apiKey) throw new Error('Enter your OpenAI API key.');
+        const granted = await chrome.permissions.request({ origins: ['https://api.openai.com/*'] });
+        if (!granted) throw new Error('OpenAI network permission was not granted.');
+        const stored = await chrome.runtime.sendMessage({ type: 'SET_API_KEY', apiKey: options.apiKey });
+        if (!stored?.ok) throw new Error(stored?.error || 'Unable to configure OpenAI API key.');
+      }
+      await savePreferences();
+    }
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) throw new Error('Open a normal website before using translation.');
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-    const result = await chrome.tabs.sendMessage(tab.id, { type, ...options });
+    const pageOptions = options ? {
+      provider: options.provider, model: options.model, target: options.target,
+      deepLocalBaseUrl: options.deepLocalBaseUrl
+    } : {};
+    const result = await chrome.tabs.sendMessage(tab.id, { type, ...pageOptions });
     if (!result?.ok) throw new Error('The webpage did not respond.');
     status.textContent = type === 'START'
-      ? 'Local translation started. Translations will appear gradually.'
+      ? (options.provider === 'openai' ? 'OpenAI translation started. Selected page text is sent to api.openai.com.' : 'Local translation started. Translations will appear gradually.')
       : 'Translations removed.';
   } catch (error) {
     status.textContent = `Operation failed: ${error.message}`;
