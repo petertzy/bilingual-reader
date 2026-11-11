@@ -191,3 +191,29 @@ test('quick tab receives preferences but never receives saved credentials', asyn
   assert.equal(result.settings.model, 'gpt-4.1-mini');
   assert.equal(JSON.stringify(result).includes('sk-private'), false);
 });
+
+test('expanded target languages are accepted with precise English language names', async () => {
+  for (const [code, name] of [
+    ['zh-CN', 'Chinese (Simplified)'],
+    ['zh-TW', 'Chinese (Traditional)'],
+    ['ja', 'Japanese'], ['ko', 'Korean'], ['ar', 'Arabic'],
+    ['pt', 'Portuguese'], ['hi', 'Hindi'], ['sw', 'Swahili']
+  ]) {
+    const worker = createWorker(() => ({ message: { content: 'Translated text' } }));
+    const result = await worker.message({
+      type: 'TRANSLATE', provider: 'ollama', model: 'gemma3:4b', target: code, text: 'Hello'
+    });
+    assert.equal(result.ok, true, code);
+    const body = JSON.parse(worker.calls[0].options.body);
+    assert.match(body.messages[0].content, new RegExp('into ' + name.replace(/[()]/g, '\\$&')));
+  }
+});
+
+test('unsupported target language remains rejected before network access', async () => {
+  const worker = createWorker(() => ({}));
+  const result = await worker.message({
+    type: 'TRANSLATE', provider: 'ollama', model: 'gemma3:4b', target: 'unknown', text: 'Hello'
+  });
+  assert.equal(result.ok, false);
+  assert.equal(worker.calls.length, 0);
+});
