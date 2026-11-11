@@ -44,7 +44,8 @@ function element({ text, tag = 'DIV', parent = '', children = [], visible = true
     },
     hasAttribute() { return false; },
     matches(selector) {
-      return /^H[1-6]$/.test(tag) && selector.includes('h1') ||
+      return tag === 'BUTTON' && selector.includes('button') ||
+        /^H[1-6]$/.test(tag) && selector.includes('h1') ||
         tag === 'P' && selector.includes('p, li');
     },
     contains(other) { return children.includes(other); }
