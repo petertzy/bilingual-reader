@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Sovereign Bilingual Reader</title>
   <style>
-    body{font:14px system-ui,sans-serif;width:318px;margin:18px;color:#18212f}
+    body{font:14px system-ui,sans-serif;width:280px;margin:14px;color:#18212f}
     h1{font-size:18px;margin:0 0 8px}p{line-height:1.5;color:#526174}
     label{display:block;margin:12px 0 4px}input,select,button{box-sizing:border-box;width:100%;padding:9px;border-radius:7px;border:1px solid #b7c0cd;font:inherit}
     button{margin-top:10px;cursor:pointer;background:#205ad7;color:white;border:0}
@@ -13,12 +13,17 @@
     button:disabled{opacity:.55;cursor:wait}
     #status{min-height:2.5em;font-size:12px;white-space:pre-wrap}
     .note{font-size:12px}
+    .topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .icon-button{width:auto;margin:0;padding:6px 10px;background:#edf1f7;color:#18212f}
+    #advanced{margin-top:10px}
+    #advanced[hidden]{display:none!important}
     [hidden]{display:none!important}
   </style>
 </head>
 <body>
-  <h1>Sovereign Bilingual Reader</h1>
-  <p>Local-first bilingual translation. Cloud requests are sent only when you select OpenAI.</p>
+  <div class="topline"><h1>Bilingual Reader</h1><button class="icon-button" id="settings-toggle" aria-expanded="false" title="Settings">Settings</button><button class="icon-button" id="close" title="Close">×</button></div>
+  <div id="advanced" hidden>
+  <p class="note">Local-first translation. OpenAI sends page text to the cloud only when selected.</p>
   <label for="provider">Translation provider</label>
   <select id="provider"><option value="ollama">Ollama</option><option value="deeplocal">deepLocal</option><option value="openai">OpenAI (cloud, opt-in)</option></select>
   <div id="deeplocal-settings" hidden>
@@ -41,7 +46,8 @@
     <option value="en">English</option><option value="de">German</option>
     <option value="fr">French</option><option value="es">Spanish</option>
   </select>
-  <button id="start">Translate current page (up to 35 blocks)</button>
+  </div>
+  <button id="start">Translate page</button>
   <button class="secondary" id="clear">Remove translations</button>
   <p id="status" role="status"></p>
   <script src="popup.js"></script>
