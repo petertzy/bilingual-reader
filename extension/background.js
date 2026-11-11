@@ -2,6 +2,7 @@
 
 const DEFAULT_DEEPLOCAL_BASE_URL = 'http://127.0.0.1:14567/v1';
 const OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
+const OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const MAX_INPUT = 3500;
 const LANGUAGES = Object.freeze({ en: 'English', de: 'German', fr: 'French', es: 'Spanish' });
 
@@ -30,6 +31,13 @@ function validateModel(raw) {
   return raw.trim();
 }
 
+function validateOpenAiApiKey(raw) {
+  if (typeof raw !== 'string' || !raw.trim() || raw.length > 512 || /[\u0000-\u0020\u007f]/.test(raw)) {
+    throw new Error('Enter a valid OpenAI API key.');
+  }
+  return raw.trim();
+}
+
 function selectBackend(message) {
   if (message.provider === 'ollama') {
     return { provider: 'ollama', baseUrl: OLLAMA_BASE_URL };
@@ -37,7 +45,10 @@ function selectBackend(message) {
   if (message.provider === 'deeplocal') {
     return { provider: 'deeplocal', baseUrl: validateLocalBaseUrl(message.deepLocalBaseUrl) };
   }
-  throw new Error('Unknown local provider.');
+  if (message.provider === 'openai') {
+    return { provider: 'openai', baseUrl: OPENAI_BASE_URL };
+  }
+  throw new Error('Unknown translation provider.');
 }
 
 async function fetchJson(url, options = {}) {
@@ -45,7 +56,7 @@ async function fetchJson(url, options = {}) {
   const timeout = setTimeout(() => controller.abort(), 90000);
   try {
     const response = await fetch(url, { ...options, redirect: 'error', signal: controller.signal });
-    if (!response.ok) throw new Error(`Local service returned HTTP ${response.status}.`);
+    if (!response.ok) throw new Error(`Translation service returned HTTP ${response.status}.`);
     return await response.json();
   } catch (error) {
     if (error.name === 'AbortError') throw new Error('Local model request timed out.');
@@ -57,6 +68,7 @@ async function fetchJson(url, options = {}) {
 
 async function listModels(message) {
   const { provider, baseUrl } = selectBackend(message);
+  if (provider === 'openai') throw new Error('Enter an OpenAI model ID manually.');
   const url = provider === 'ollama' ? `${baseUrl}/api/tags` : `${baseUrl}/models`;
   const data = await fetchJson(url);
   const entries = provider === 'ollama'
@@ -79,14 +91,20 @@ async function translate(message) {
   const endpoint = provider === 'ollama' ? `${baseUrl}/api/chat` : `${baseUrl}/chat/completions`;
   const payload = provider === 'ollama'
     ? { model, stream: false, options: { temperature: 0 }, messages }
-    : { model, stream: false, temperature: 0, use_documents: false, messages };
+    : provider === 'deeplocal'
+      ? { model, stream: false, temperature: 0, use_documents: false, messages }
+      : { model, stream: false, messages };
+  const headers = { 'Content-Type': 'application/json' };
+  if (provider === 'openai') {
+    headers.Authorization = `Bearer ${validateOpenAiApiKey(message.apiKey)}`;
+  }
   const result = await fetchJson(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload)
   });
   const output = provider === 'ollama' ? result?.message?.content : result?.choices?.[0]?.message?.content;
-  if (typeof output !== 'string' || !output.trim()) throw new Error('The local model returned no translation.');
+  if (typeof output !== 'string' || !output.trim()) throw new Error('The model returned no translation.');
   return output.trim();
 }
 
