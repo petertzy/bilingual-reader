@@ -2,6 +2,8 @@
 
 A compact, inspectable Chrome Manifest V3 extension for bilingual webpage translation. Version 0.3 supports **two local model services (Ollama and deepLocal) plus an optional OpenAI cloud translation backend**. Original paragraphs remain visible while translated text is added below each block.
 
+<img width="1438" height="629" alt="Bildschirmfoto 2026-11-11 um 19 32 44" src="https://github.com/user-attachments/assets/d4d6c876-644b-4326-bbe5-ca04a62c666f" />
+
 ## Security model
 
 - No telemetry, accounts, CDN dependencies, remote scripts, or automatic updates implemented by this extension. OpenAI is an optional cloud integration that sends selected page text to OpenAI only when chosen.
