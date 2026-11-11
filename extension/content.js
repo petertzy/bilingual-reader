@@ -84,6 +84,17 @@
   }
 
 
+  function insertTranslation(original, wrapper) {
+    // deepLocal renders a user message's text directly in div.message.user,
+    // with its Copy controls inside a nested .messageActions element.
+    // Keep the bilingual text in the message bubble, before those controls.
+    if (original.matches('.message.user') && directText(original).length >= 25) {
+      original.insertBefore(wrapper, original.querySelector('.messageActions'));
+    } else {
+      original.insertAdjacentElement('afterend', wrapper);
+    }
+  }
+
   async function translate(options) {
     if (state.running) return;
     const generation = ++state.generation;
@@ -101,7 +112,7 @@
         if (!segments.length) continue;
         original.setAttribute(MARK, 'original');
         const wrapper = translationNode('');
-        original.insertAdjacentElement('afterend', wrapper);
+        insertTranslation(original, wrapper);
         for (const segment of segments) {
           if (tasks.length >= MAX_TASKS) break;
           const line = document.createElement('div');
