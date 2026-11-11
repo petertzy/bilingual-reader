@@ -4,7 +4,44 @@ const DEFAULT_DEEPLOCAL_BASE_URL = 'http://127.0.0.1:14567/v1';
 const OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
 const OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const MAX_INPUT = 3500;
-const LANGUAGES = Object.freeze({ en: 'English', de: 'German', fr: 'French', es: 'Spanish' });
+const LANGUAGES = Object.freeze({
+  'en': 'English',
+  'zh-CN': 'Chinese (Simplified)',
+  'zh-TW': 'Chinese (Traditional)',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+  'pt': 'Portuguese',
+  'it': 'Italian',
+  'ru': 'Russian',
+  'ja': 'Japanese',
+  'ko': 'Korean',
+  'ar': 'Arabic',
+  'hi': 'Hindi',
+  'bn': 'Bengali',
+  'ur': 'Urdu',
+  'id': 'Indonesian',
+  'ms': 'Malay',
+  'vi': 'Vietnamese',
+  'th': 'Thai',
+  'tr': 'Turkish',
+  'nl': 'Dutch',
+  'pl': 'Polish',
+  'uk': 'Ukrainian',
+  'fa': 'Persian',
+  'sw': 'Swahili',
+  'ta': 'Tamil',
+  'te': 'Telugu',
+  'he': 'Hebrew',
+  'el': 'Greek',
+  'sv': 'Swedish',
+  'da': 'Danish',
+  'fi': 'Finnish',
+  'no': 'Norwegian',
+  'cs': 'Czech',
+  'ro': 'Romanian',
+  'hu': 'Hungarian'
+});
 
 // Restrict stored credentials before handling any translation requests.
 const secureStorageReady = Promise.all([
