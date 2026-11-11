@@ -223,7 +223,8 @@ async function send(type) {
   }
 }
 
-document.getElementById('unlock-api-key').addEventListener('click', async () => {
+document.getElementById('vault-unlock-form').addEventListener('submit', async event => {
+  event.preventDefault();
   try {
     await storageReady;
     const { encryptedOpenAiApiKey } = await chrome.storage.local.get('encryptedOpenAiApiKey');
