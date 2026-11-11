@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sovereign Bilingual Reader",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "On-demand bilingual page translation with local Ollama, deepLocal, or optional OpenAI.",
   "permissions": [
     "activeTab",
