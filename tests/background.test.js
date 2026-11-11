@@ -10,9 +10,16 @@ const script = fs.readFileSync(path.join(__dirname, '../extension/background.js'
 function createWorker(responder) {
   let handler;
   const calls = [];
+  const sessionValues = {};
   const context = {
     URL, AbortController, setTimeout, clearTimeout,
-    chrome: { runtime: { onMessage: { addListener(fn) { handler = fn; } } } },
+    chrome: {
+      runtime: { onMessage: { addListener(fn) { handler = fn; } } },
+      storage: { session: {
+        async get(key) { return { [key]: sessionValues[key] }; },
+        async set(values) { Object.assign(sessionValues, values); }
+      } }
+    },
     fetch: async (url, options = {}) => {
       calls.push({ url, options });
       return { ok: true, json: async () => responder(url, options) };
@@ -111,8 +118,13 @@ test('network calls explicitly reject HTTP redirects', async () => {
 
 test('OpenAI uses fixed HTTPS endpoint, Bearer token, and no local document retrieval option', async () => {
   const worker = createWorker(() => ({ choices: [{ message: { content: 'Hello' } }] }));
-  const result = await worker.message({type:'TRANSLATE',provider:'openai',apiKey:'sk-test',model:'gpt-4.1-mini',target:'en',text:'Hallo'});
-  assert.equal(result.ok,true);
+  const result = await worker.message({type:'TRANSLATE',provider:'openai',model:'gpt-4.1-mini',target:'en',text:'Hallo'});
+  assert.equal(result.ok,false);
+  assert.equal(worker.calls.length,0);
+  const configured = await worker.message({type:'SET_API_KEY',apiKey:'sk-test'},false);
+  assert.equal(configured.ok,true);
+  const translated = await worker.message({type:'TRANSLATE',provider:'openai',model:'gpt-4.1-mini',target:'en',text:'Hallo'});
+  assert.equal(translated.ok,true);
   assert.equal(worker.calls[0].url,'https://api.openai.com/v1/chat/completions');
   assert.equal(worker.calls[0].options.headers.Authorization,'Bearer sk-test');
   assert.equal(worker.calls[0].options.redirect,'error');
@@ -123,7 +135,7 @@ test('OpenAI uses fixed HTTPS endpoint, Bearer token, and no local document retr
 
 test('OpenAI missing key is rejected before network activity', async () => {
   const worker = createWorker(() => ({}));
-  const result = await worker.message({type:'TRANSLATE',provider:'openai',apiKey:'',model:'gpt-4.1-mini',target:'en',text:'Hallo'});
+  const result = await worker.message({type:'TRANSLATE',provider:'openai',model:'gpt-4.1-mini',target:'en',text:'Hallo'});
   assert.equal(result.ok,false);
   assert.equal(worker.calls.length,0);
 });
@@ -131,6 +143,13 @@ test('OpenAI missing key is rejected before network activity', async () => {
 test('OpenAI model discovery is disabled without contacting its API', async () => {
   const worker = createWorker(() => ({}));
   const result = await worker.message({type:'LIST_MODELS',provider:'openai'},false);
+  assert.equal(result.ok,false);
+  assert.equal(worker.calls.length,0);
+});
+
+test('content scripts cannot set or overwrite OpenAI API credentials', async () => {
+  const worker=createWorker(() => ({}));
+  const result=await worker.message({type:'SET_API_KEY',apiKey:'sk-injected'},true);
   assert.equal(result.ok,false);
   assert.equal(worker.calls.length,0);
 });
