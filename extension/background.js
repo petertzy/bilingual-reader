@@ -59,7 +59,7 @@ async function fetchJson(url, options = {}) {
     if (!response.ok) throw new Error(`Translation service returned HTTP ${response.status}.`);
     return await response.json();
   } catch (error) {
-    if (error.name === 'AbortError') throw new Error('Local model request timed out.');
+    if (error.name === 'AbortError') throw new Error('Translation request timed out.');
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -96,7 +96,8 @@ async function translate(message) {
       : { model, stream: false, messages };
   const headers = { 'Content-Type': 'application/json' };
   if (provider === 'openai') {
-    headers.Authorization = `Bearer ${validateOpenAiApiKey(message.apiKey)}`;
+    const session = await chrome.storage.session.get('openAiApiKey');
+    headers.Authorization = `Bearer ${validateOpenAiApiKey(session.openAiApiKey)}`;
   }
   const result = await fetchJson(endpoint, {
     method: 'POST',
@@ -109,6 +110,22 @@ async function translate(message) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message?.type === 'SET_API_KEY') {
+    if (sender.tab) {
+      respond({ ok: false, error: 'API keys can only be configured in the extension popup.' });
+      return false;
+    }
+    try {
+      const key = validateOpenAiApiKey(message.apiKey);
+      chrome.storage.session.set({ openAiApiKey: key })
+        .then(() => respond({ ok: true }))
+        .catch(() => respond({ ok: false, error: 'Unable to store the API key for this browser session.' }));
+    } catch (error) {
+      respond({ ok: false, error: String(error.message || error) });
+      return false;
+    }
+    return true;
+  }
   if (message?.type !== 'TRANSLATE' && message?.type !== 'LIST_MODELS') return false;
   if (message.type === 'TRANSLATE' && !sender.tab?.id) {
     respond({ ok: false, error: 'Translation is only available from an active webpage.' });
