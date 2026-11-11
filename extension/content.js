@@ -57,7 +57,11 @@
     const tasks = [];
     let progress = null;
     try {
-      const blocks = candidates();
+      const blocks = candidates().sort((a, b) => {
+        const ay = Math.abs(a.getBoundingClientRect().top - window.innerHeight * 0.35);
+        const by = Math.abs(b.getBoundingClientRect().top - window.innerHeight * 0.35);
+        return ay - by;
+      });
       if (!blocks.length) return;
       progress = translationNode('Preparing translation...');
       progress.setAttribute(MARK, 'progress');
@@ -86,10 +90,12 @@
       let next = 0;
       let completed = 0;
       let failed = 0;
+      let fatalError = '';
+      let succeeded = 0;
       updateProgress(progress, 0, total, 0);
-      const concurrency = options.provider === 'openai' ? 3 : 2;
+      const concurrency = options.provider === 'openai' ? 2 : 2;
       async function worker() {
-        while (generation === state.generation) {
+        while (generation === state.generation && !fatalError) {
           const index = next++;
           if (index >= tasks.length) return;
           const task = tasks[index];
@@ -99,6 +105,7 @@
             });
             if (generation !== state.generation) return;
             if (!result?.ok) throw new Error(result?.error || 'Translation failed');
+            succeeded++;
             if (task.line.isConnected) {
               task.line.textContent = result.translation;
               task.line.style.opacity = '1';
@@ -106,13 +113,13 @@
           } catch (error) {
             if (generation !== state.generation) return;
             failed++;
+            const reason = String(error.message || error).slice(0, 240);
             if (task.line.isConnected) {
-              task.line.textContent = 'Translation unavailable.';
-              task.line.title = String(error.message || error).slice(0, 300);
+              task.line.textContent = `Translation failed: ${reason}`;
             }
-            console.warn('[Sovereign Bilingual] Translation failed:', error.message);
-            if (/HTTP 401|HTTP 403|HTTP 429|Invalid OpenAI API key|timed out|Failed to fetch/.test(String(error.message))) {
-              next = tasks.length;
+            console.warn('[Sovereign Bilingual] Translation failed:', reason);
+            if (/HTTP 400|HTTP 401|HTTP 402|HTTP 403|HTTP 404|HTTP 429|Invalid OpenAI API key|Failed to fetch|network error/i.test(reason)) {
+              fatalError = reason;
             }
           } finally {
             if (generation === state.generation) {
@@ -124,7 +131,11 @@
       }
       await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
       if (generation === state.generation && progress?.isConnected) {
-        progress.textContent = `Translation finished: ${completed}/${total} sentences${failed ? ` · ${failed} failed` : ''}`;
+        if (fatalError) {
+          progress.textContent = `Translation stopped: ${succeeded} succeeded, ${failed} failed. ${fatalError}`;
+        } else {
+          progress.textContent = `Translation complete: ${succeeded}/${total} sentences succeeded${failed ? ` · ${failed} failed` : ''}`;
+        }
       }
     } finally {
       if (generation === state.generation) state.running = false;
