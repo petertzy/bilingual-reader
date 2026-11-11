@@ -115,6 +115,12 @@ async function send(type) {
   try {
     const options = type === 'START' ? settings() : null;
     if (options) {
+      const backend = await chrome.runtime.sendMessage({ type: 'GET_BACKEND_INFO' });
+      if (!backend?.ok || !backend.providers?.includes(options.provider) || backend.version !== chrome.runtime.getManifest().version) {
+        throw new Error('Extension components are out of date. Reload the extension at chrome://extensions, then refresh this webpage.');
+      }
+    }
+    if (options) {
       if (options.provider === 'openai') {
         if (!options.apiKey) throw new Error('Enter your OpenAI API key.');
         // OpenAI access is declared in the manifest; the provider remains opt-in.
