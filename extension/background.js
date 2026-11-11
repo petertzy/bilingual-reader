@@ -56,7 +56,14 @@ async function fetchJson(url, options = {}) {
   const timeout = setTimeout(() => controller.abort(), 90000);
   try {
     const response = await fetch(url, { ...options, redirect: 'error', signal: controller.signal });
-    if (!response.ok) throw new Error(`Translation service returned HTTP ${response.status}.`);
+    if (!response.ok) {
+      let details = '';
+      try {
+        const body = await response.json();
+        details = String(body?.error?.message || body?.message || '').slice(0, 240);
+      } catch { /* Preserve HTTP status if response body is not JSON. */ }
+      throw new Error(`HTTP ${response.status}${details ? `: ${details}` : ''}`);
+    }
     return await response.json();
   } catch (error) {
     if (error.name === 'AbortError') throw new Error('Translation request timed out.');
