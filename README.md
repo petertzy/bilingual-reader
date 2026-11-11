@@ -87,3 +87,7 @@ No npm dependency installation or build step is required.
 ## License
 
 MIT. Original standalone starter code, not derived from BiRead or FluentRead.
+
+## Progressive translation
+
+Version 0.4.0 splits eligible page paragraphs into short sentence-sized translation jobs. Results appear next to their source paragraph as each request finishes. OpenAI uses up to three concurrent requests, and local backends use up to two. The extension processes up to 35 visible blocks and 120 sentence jobs per run. A progress indicator shows completed jobs and failures. Removing translations invalidates pending results, so they cannot reappear afterward. Translation speed depends on the selected model and network conditions; multiple OpenAI requests may incur usage charges and rate limits.
