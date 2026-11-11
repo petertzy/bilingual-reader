@@ -11,14 +11,23 @@ function createWorker(responder) {
   let handler;
   const calls = [];
   const sessionValues = {};
+  const localValues = {};
+  const accessLevels = [];
   const context = {
     URL, AbortController, setTimeout, clearTimeout,
     chrome: {
       runtime: { onMessage: { addListener(fn) { handler = fn; } } },
-      storage: { session: {
-        async get(key) { return { [key]: sessionValues[key] }; },
-        async set(values) { Object.assign(sessionValues, values); }
-      } }
+      storage: {
+        session: {
+          async setAccessLevel(options) { accessLevels.push(['session', options.accessLevel]); },
+          async get(key) { return { [key]: sessionValues[key] }; },
+          async set(values) { Object.assign(sessionValues, values); }
+        },
+        local: {
+          async setAccessLevel(options) { accessLevels.push(['local', options.accessLevel]); },
+          async get(keys) { return Object.fromEntries(keys.map(key => [key, localValues[key]])); }
+        }
+      }
     },
     fetch: async (url, options = {}) => {
       calls.push({ url, options });
@@ -29,6 +38,8 @@ function createWorker(responder) {
   return {
     calls,
     setSessionKey(key) { sessionValues.openAiApiKey = key; },
+    setRememberedKey(key) { localValues.openAiApiKey = key; localValues.rememberOpenAiKey = true; },
+    accessLevels,
     message(request, fromTab = true) {
       return new Promise(resolve => {
         const isAsync = handler(request, fromTab ? { tab: { id: 1 } } : {}, resolve);
@@ -152,4 +163,19 @@ test('content scripts cannot set or overwrite OpenAI API credentials', async () 
   const result=await worker.message({type:'SET_API_KEY',apiKey:'sk-injected'},true);
   assert.equal(result,null);
   assert.equal(worker.calls.length,0);
+});
+
+test('storage is restricted to trusted extension contexts on startup', async () => {
+  const worker = createWorker(() => ({}));
+  assert.deepEqual(worker.accessLevels, [
+    ['local', 'TRUSTED_CONTEXTS'], ['session', 'TRUSTED_CONTEXTS']
+  ]);
+});
+
+test('remembered OpenAI key is restored only after storage restrictions are set', async () => {
+  const worker = createWorker(() => ({ choices: [{ message: { content: 'Hello' } }] }));
+  worker.setRememberedKey('sk-remembered');
+  const result = await worker.message({ type: 'TRANSLATE', provider: 'openai', model: 'gpt-4.1-mini', target: 'en', text: 'Hallo' });
+  assert.equal(result.ok, true);
+  assert.equal(worker.calls[0].options.headers.Authorization, 'Bearer sk-remembered');
 });
