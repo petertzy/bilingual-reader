@@ -9,6 +9,7 @@ const deepLocalSettings = document.getElementById('deeplocal-settings');
 const openAiSettings = document.getElementById('openai-settings');
 const apiKeyInput = document.getElementById('openai-api-key');
 const rememberKeyInput = document.getElementById('remember-openai-key');
+const vaultPassphraseInput = document.getElementById('vault-passphrase');
 const discoverButton = document.getElementById('discover');
 const modelList = document.getElementById('model-list');
 const status = document.getElementById('status');
@@ -18,6 +19,45 @@ const storageReady = Promise.all([
   chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
   chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
 ]);
+
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+const KDF_ITERATIONS = 310000;
+function base64(bytes) {
+  return btoa(String.fromCharCode(...bytes));
+}
+function fromBase64(value) {
+  return Uint8Array.from(atob(value), char => char.charCodeAt(0));
+}
+async function deriveVaultKey(passphrase, salt) {
+  const material = await crypto.subtle.importKey('raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: KDF_ITERATIONS, hash: 'SHA-256' },
+    material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+async function encryptCredential(credential, passphrase) {
+  if (passphrase.length < 12) throw new Error('Use a passphrase of at least 12 characters.');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveVaultKey(passphrase, salt);
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoder.encode(credential));
+  return { version: 1, kdf: 'PBKDF2-SHA256', iterations: KDF_ITERATIONS, salt: base64(salt), iv: base64(iv), ciphertext: base64(new Uint8Array(ciphertext)) };
+}
+async function decryptCredential(record, passphrase) {
+  if (!record || record.version !== 1 || record.kdf !== 'PBKDF2-SHA256' ||
+      record.iterations !== KDF_ITERATIONS) throw new Error('Unsupported encrypted key format.');
+  try {
+    const key = await deriveVaultKey(passphrase, fromBase64(record.salt));
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: fromBase64(record.iv) }, key, fromBase64(record.ciphertext)
+    );
+    return decoder.decode(plaintext);
+  } catch {
+    throw new Error('Incorrect passphrase or damaged encrypted key.');
+  }
+}
 
 function validLocalBaseUrl(raw) {
   const url = new URL(raw.trim());
@@ -65,12 +105,22 @@ async function savePreferences() {
     rememberOpenAiKey: rememberKeyInput.checked,
     target: targetInput.value
   };
-  if (rememberKeyInput.checked) values.openAiApiKey = apiKeyInput.value.trim();
-  else await chrome.storage.local.remove('openAiApiKey');
+  // Credential persistence is managed explicitly, never by preference changes.
   await chrome.storage.local.set(values);
 }
 
-storageReady.then(() => chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'openAiApiKey', 'rememberOpenAiKey', 'deepLocalBaseUrl', 'model', 'target'])).then(prefs => {
+storageReady.then(async () => {
+  const prefs = await chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'openAiApiKey', 'encryptedOpenAiApiKey', 'rememberOpenAiKey', 'deepLocalBaseUrl', 'model', 'target']);
+  if (prefs.openAiApiKey) {
+    // Migrate old plaintext storage to session-only without writing it back to disk.
+    await chrome.storage.session.set({ openAiApiKey: prefs.openAiApiKey });
+    await chrome.storage.local.remove('openAiApiKey');
+    await chrome.storage.local.set({ rememberOpenAiKey: false });
+    prefs.rememberOpenAiKey = false;
+    status.textContent = 'Previous plaintext key moved to this session. Save it with a passphrase to remember it securely.';
+  }
+  return prefs;
+}).then(prefs => {
   modelsByProvider = {
     ollama: prefs.ollamaModel || prefs.model || 'gemma3:4b',
     deeplocal: prefs.deepLocalModel || '',
@@ -78,8 +128,8 @@ storageReady.then(() => chrome.storage.local.get(['provider', 'ollamaModel', 'de
   };
   deepLocalInput.value = prefs.deepLocalBaseUrl || DEFAULT_DEEPLOCAL_BASE_URL;
   providerInput.value = ['deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
-  rememberKeyInput.checked = Boolean(prefs.rememberOpenAiKey);
-  if (rememberKeyInput.checked) apiKeyInput.value = prefs.openAiApiKey || '';
+  rememberKeyInput.checked = Boolean(prefs.encryptedOpenAiApiKey);
+  apiKeyInput.value = '';
   if (['en', 'de', 'fr', 'es'].includes(prefs.target)) targetInput.value = prefs.target;
   toggleProvider();
 }).catch(error => { status.textContent = `Unable to secure key storage: ${error.message}`; });
@@ -89,7 +139,17 @@ providerInput.addEventListener('change', async () => {
   await savePreferences();
 });
 modelInput.addEventListener('change', () => { savePreferences().catch(() => {}); });
-rememberKeyInput.addEventListener('change', () => { savePreferences().catch(() => {}); });
+rememberKeyInput.addEventListener('change', async () => {
+  try {
+    if (!rememberKeyInput.checked) {
+      await storageReady;
+      await chrome.storage.local.remove(['encryptedOpenAiApiKey', 'openAiApiKey']);
+      vaultPassphraseInput.value = '';
+      status.textContent = 'Saved credential removed. Session access remains available.';
+    }
+    await savePreferences();
+  } catch (error) { status.textContent = `Unable to update key storage: ${error.message}`; }
+});
 
 document.getElementById('discover').addEventListener('click', async () => {
   status.textContent = 'Contacting local model service...';
@@ -137,6 +197,12 @@ async function send(type) {
           if (!stored.openAiApiKey) throw new Error('Enter your OpenAI API key.');
         }
       }
+      if (options.provider === 'openai' && rememberKeyInput.checked && options.apiKey) {
+        const passphrase = vaultPassphraseInput.value;
+        const encrypted = await encryptCredential(options.apiKey, passphrase);
+        await chrome.storage.local.set({ encryptedOpenAiApiKey: encrypted });
+        vaultPassphraseInput.value = '';
+      }
       await savePreferences();
     }
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -157,14 +223,28 @@ async function send(type) {
   }
 }
 
+document.getElementById('unlock-api-key').addEventListener('click', async () => {
+  try {
+    await storageReady;
+    const { encryptedOpenAiApiKey } = await chrome.storage.local.get('encryptedOpenAiApiKey');
+    if (!encryptedOpenAiApiKey) throw new Error('No encrypted API key is saved.');
+    const key = await decryptCredential(encryptedOpenAiApiKey, vaultPassphraseInput.value);
+    await chrome.storage.session.set({ openAiApiKey: key });
+    apiKeyInput.value = '';
+    vaultPassphraseInput.value = '';
+    status.textContent = 'API key unlocked for this browser session.';
+  } catch (error) { status.textContent = `Unable to unlock key: ${error.message}`; }
+});
+
 document.getElementById('forget-api-key').addEventListener('click', async () => {
   try {
     await storageReady;
     await Promise.all([
-      chrome.storage.local.remove('openAiApiKey'),
+      chrome.storage.local.remove(['openAiApiKey', 'encryptedOpenAiApiKey']),
       chrome.storage.session.remove('openAiApiKey')
     ]);
     apiKeyInput.value = '';
+    vaultPassphraseInput.value = '';
     rememberKeyInput.checked = false;
     await chrome.storage.local.set({ rememberOpenAiKey: false });
     status.textContent = 'OpenAI API key forgotten on this device.';
