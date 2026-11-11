@@ -117,8 +117,7 @@ async function send(type) {
     if (options) {
       if (options.provider === 'openai') {
         if (!options.apiKey) throw new Error('Enter your OpenAI API key.');
-        const granted = await chrome.permissions.request({ origins: ['https://api.openai.com/*'] });
-        if (!granted) throw new Error('OpenAI network permission was not granted.');
+        // OpenAI access is declared in the manifest; the provider remains opt-in.
         const stored = await chrome.runtime.sendMessage({ type: 'SET_API_KEY', apiKey: options.apiKey });
         if (!stored?.ok) throw new Error(stored?.error || 'Unable to configure OpenAI API key.');
       }
