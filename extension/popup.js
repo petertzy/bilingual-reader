@@ -137,13 +137,29 @@ async function send(type) {
     } : {};
     const result = await chrome.tabs.sendMessage(tab.id, { type, ...pageOptions });
     if (!result?.ok) throw new Error('The webpage did not respond.');
-    status.textContent = type === 'START'
-      ? (options.provider === 'openai' ? 'OpenAI translation started. Selected page text is sent to api.openai.com.' : 'Local translation started. Translations will appear gradually.')
-      : 'Translations removed.';
+    if (type === 'START') window.close();
+    else status.textContent = 'Translations removed.';
   } catch (error) {
     status.textContent = `Operation failed: ${error.message}`;
+    document.getElementById('advanced').hidden = false;
+    document.getElementById('settings-toggle').setAttribute('aria-expanded', 'true');
   }
 }
+
+document.getElementById('settings-toggle').addEventListener('click', () => {
+  const advanced = document.getElementById('advanced');
+  advanced.hidden = !advanced.hidden;
+  document.getElementById('settings-toggle').setAttribute('aria-expanded', String(!advanced.hidden));
+});
+document.getElementById('close').addEventListener('click', () => window.close());
+
+// Opening the extension action installs the small on-page tab on normal webpages.
+chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+  if (tab?.id && /^https?:\/\//.test(tab.url || '')) {
+    try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] }); }
+    catch { /* Restricted pages do not support injected controls. */ }
+  }
+}).catch(() => {});
 
 document.getElementById('start').addEventListener('click', () => send('START'));
 document.getElementById('clear').addEventListener('click', () => send('CLEAR'));
