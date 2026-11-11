@@ -1,13 +1,13 @@
 # Sovereign Bilingual Reader
 
-A compact, inspectable Chrome Manifest V3 extension for bilingual webpage translation. Version 0.2 supports **two local-only model services: Ollama and deepLocal**. Original paragraphs remain visible while translated text is added below each block.
+A compact, inspectable Chrome Manifest V3 extension for bilingual webpage translation. Version 0.3 supports **two local model services (Ollama and deepLocal) plus an optional OpenAI cloud translation backend**. Original paragraphs remain visible while translated text is added below each block.
 
 ## Security model
 
-- No cloud translation APIs, telemetry, accounts, CDN dependencies, remote scripts, or automatic updates implemented by this extension.
+- No telemetry, accounts, CDN dependencies, remote scripts, or automatic updates implemented by this extension. OpenAI is an optional cloud integration that sends selected page text to OpenAI only when chosen.
 - `activeTab` and `scripting`: the extension reads a webpage only after the user clicks Translate. No `<all_urls>` permission.
-- The only network host permission is `http://127.0.0.1/*`; Chrome match patterns cannot restrict permissions to individual ports. Application code strictly validates deepLocal URLs and permits **only** numeric `127.0.0.1` and the `/v1` base path. Remote hosts, hostnames, HTTP redirects to remote endpoints, usernames and query parameters are forbidden in configured URLs.
-- The extension sends paragraph text to the selected service running on the same computer. It does not store webpage content.
+- The only default network host permission is `http://127.0.0.1/*`; the OpenAI endpoint `https://api.openai.com/*` is an optional host permission requested only when OpenAI translation starts. Chrome match patterns cannot restrict permissions to individual ports. Application code strictly validates deepLocal URLs and permits **only** numeric `127.0.0.1` and the `/v1` base path. Remote hosts, hostnames, HTTP redirects to remote endpoints, usernames and query parameters are forbidden in configured URLs.
+- Local modes send paragraph text to a service running on the same computer. OpenAI mode sends selected paragraph text to `api.openai.com` and requires explicit user choice. The extension does not persist webpage content.
 - deepLocal translation requests set `use_documents: false` to avoid accessing its optional indexed documents.
 - Translations are inserted with `textContent`, not `innerHTML`.
 - This is **not** a formal independent security audit. A compromised localhost service, model, operating system, or browser extension remains a separate risk. Do not expose local model APIs over the internet.
@@ -17,7 +17,7 @@ A compact, inspectable Chrome Manifest V3 extension for bilingual webpage transl
 1. Download this project, extract it, and inspect the files under `extension/`.
 2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the `extension/` directory.
 3. Open a regular webpage and click the extension icon.
-4. Choose **Ollama** or **deepLocal**, select a target language, and click **Translate current page**.
+4. Choose **Ollama**, **deepLocal**, or **OpenAI**, select a target language, and click **Translate current page**.
 5. Click **Remove translations** when done.
 
 ## Ollama
@@ -49,6 +49,16 @@ curl http://127.0.0.1:14567/v1/models
 
 For packaged apps, substitute the actual `127.0.0.1` port shown by deepLocal. Avoid binding deepLocal to `0.0.0.0` for normal personal use.
 
+## OpenAI (optional cloud service)
+
+1. In the extension popup, select **OpenAI (cloud, opt-in)**.
+2. Enter an OpenAI API key. The key remains in the popup session unless you enable **Remember key on this device**; enabling it stores the key unencrypted in `chrome.storage.local`, accessible to the extension and local browser-profile access.
+3. Enter the OpenAI model ID (default: `gpt-4.1-mini`). Model discovery is not offered for this provider.
+4. Click **Translate current page** and approve Chrome's one-time permission request for `https://api.openai.com/*`.
+5. The extension posts source text to `https://api.openai.com/v1/chat/completions` using Bearer token authentication. Unlike local modes, translated page content leaves your computer, subject to OpenAI's applicable API data practices and terms.
+
+Cloud translation is never automatic fallback. The OpenAI API key is not bundled with the extension, and API calls may incur charges. Revoking site access for `api.openai.com` in Chrome extension settings prevents further cloud requests.
+
 ## Supported languages
 
 The current target-language selector offers English, German, French, and Spanish. The extension code, UI, comments, configuration, tests, and documentation are English-only. It does not bundle Chinese-language resources or China-hosted translation services.
@@ -59,7 +69,7 @@ The current target-language selector offers English, German, French, and Spanish
 - YouTube subtitle translation, PDFs, OCR, speech recognition, and auto-translation are **not yet implemented**.
 - Chrome internal pages and protected browser pages cannot be scripted.
 - Automatic language detection and progress reporting are not implemented.
-- No real Ollama/deepLocal connection has been tested in this build environment. The automated tests use local mocked API responses.
+- No live Ollama, deepLocal, or OpenAI connection has been tested in this build environment. The automated tests use local mocked API responses.
 
 ## Tests
 
