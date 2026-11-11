@@ -52,7 +52,7 @@ For packaged apps, substitute the actual `127.0.0.1` port shown by deepLocal. Av
 ## OpenAI (optional cloud service)
 
 1. In the extension popup, select **OpenAI (cloud, opt-in)**.
-2. Enter an OpenAI API key. The key remains in the popup session unless you enable **Remember key on this device**; enabling it stores the key unencrypted in `chrome.storage.local`, accessible to the extension and local browser-profile access.
+2. Enter an OpenAI API key. The key is sent from the popup to background-only `chrome.storage.session` for the browser session, and is never passed into the webpage content script. Unless you enable **Remember key on this device**, it is not written to persistent extension storage. Enabling that option additionally saves the key unencrypted in `chrome.storage.local`, which can be accessed by the extension and by anyone with sufficient local browser-profile access.
 3. Enter the OpenAI model ID (default: `gpt-4.1-mini`). Model discovery is not offered for this provider.
 4. Click **Translate current page** and approve Chrome's one-time permission request for `https://api.openai.com/*`.
 5. The extension posts source text to `https://api.openai.com/v1/chat/completions` using Bearer token authentication. Unlike local modes, translated page content leaves your computer, subject to OpenAI's applicable API data practices and terms.
