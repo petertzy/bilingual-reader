@@ -12,7 +12,7 @@
   const excluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"]';
 
   // Include headings and text-only chat bubbles without translating controls or containers twice.
-  const textSelector = 'p, li, h1, h2, h3, h4, h5, h6, [role="heading"], main div, article div, [role="main"] div, [data-message-author-role] div';
+  const textSelector = 'p, li, h1, h2, h3, h4, h5, h6, [role="heading"], div, span';
   const structuralText = 'p, li, h1, h2, h3, h4, h5, h6, [role="heading"]';
   const uiExcluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"],[role="button"],[role="toolbar"],[role="menu"],[role="menubar"],[role="tablist"],[role="textbox"],[aria-hidden="true"]';
 
@@ -24,10 +24,10 @@
         const text = el.innerText?.trim();
         if (!text || text.length < 25 || text.length > MAX_CHARS) return false;
         if (!el.matches(structuralText)) {
-          // A chat bubble may use plain div elements; only translate the innermost
-          // text container to avoid capturing whole messages or toolbars.
+          // Chat prompts may be leaf divs or spans outside semantic landmarks.
+          // Skip interactive wrappers and parent containers with visible child text.
+          if (el.querySelector('button, input, textarea, select, a, [role="button"], [contenteditable]')) return false;
           if (Array.from(el.children).some(child => child.innerText?.trim())) return false;
-          if (!el.closest('main, article, [role="main"], [data-message-author-role]')) return false;
         }
         return true;
       })

@@ -33,6 +33,7 @@ function element({ text, tag = 'DIV', parent = '', children = [], visible = true
   return {
     innerText: text,
     children,
+    querySelector(selector) { return parent === 'interactive' && selector.includes('button') ? {} : null; },
     getClientRects() { return visible ? [{}] : []; },
     closest(selector) {
       if (selector.includes('script,style')) return parent === 'excluded' ? this : null;
@@ -50,7 +51,7 @@ function element({ text, tag = 'DIV', parent = '', children = [], visible = true
 }
 
 test('includes text-only chat questions and headings', () => {
-  const question = element({ text: "What's a surprising fact about your city?", parent: 'main' });
+  const question = element({ text: "What's a surprising fact about your city?", parent: 'outside-main' });
   const heading = element({ text: 'An interesting article heading', tag: 'H2' });
   assert.deepEqual(selectCandidates([question, heading]), [question, heading]);
 });
@@ -61,4 +62,10 @@ test('skips toolbar content, hidden text, and wrapper duplicates', () => {
   const toolbar = element({ text: 'Copy the selected text into the clipboard', parent: 'excluded' });
   const hidden = element({ text: 'This should not be translated when invisible', parent: 'main', visible: false });
   assert.deepEqual(selectCandidates([wrapper, question, toolbar, hidden]), [question]);
+});
+
+test('includes leaf chat prompts outside main and excludes interactive wrappers', () => {
+  const prompt = element({ text: 'What is a surprising fact about your city?', tag: 'SPAN', parent: 'outside-main' });
+  const interactive = element({ text: 'What is a surprising fact about your city? Copy', parent: 'interactive' });
+  assert.deepEqual(selectCandidates([prompt, interactive]), [prompt]);
 });
