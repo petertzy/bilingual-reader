@@ -35,10 +35,14 @@
     <label for="openai-api-key">OpenAI API key</label>
     <input id="openai-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-...">
     <label style="display:flex;align-items:center;gap:8px"><input id="remember-openai-key" type="checkbox" style="width:auto">Remember encrypted key on this device</label>
-    <label for="vault-passphrase">Vault passphrase (12+ characters)</label>
-    <input id="vault-passphrase" type="password" autocomplete="off" spellcheck="false" placeholder="Passphrase for encrypted key">
-    <button class="secondary" id="unlock-api-key" type="button">Unlock saved API key</button>
-    <p class="note">Remembering a key encrypts it with your passphrase using AES-256-GCM and PBKDF2. After restarting Chrome, unlock it once per browser session. A lost passphrase cannot be recovered.</p>
+    <form id="vault-unlock-form" autocomplete="on">
+      <label for="vault-account">Vault account</label>
+      <input id="vault-account" type="text" name="username" autocomplete="username" value="sovereign-reader-vault" readonly>
+      <label for="vault-passphrase">Vault passphrase (12+ characters)</label>
+      <input id="vault-passphrase" name="password" type="password" autocomplete="current-password" spellcheck="false" placeholder="Passphrase for encrypted key">
+      <button class="secondary" id="unlock-api-key" type="submit">Unlock saved API key</button>
+    </form>
+    <p class="note">Your password manager may offer to fill the vault passphrase. Autofill support varies in Chrome extension popups. The passphrase is not saved by this extension. Unlock once per browser session. A lost passphrase cannot be recovered.</p>
     <button class="secondary" id="forget-api-key" type="button">Forget API Key</button>
   </div>
   <label for="model">Model ID</label>
