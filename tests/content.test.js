@@ -120,3 +120,49 @@ test('normalizes whitespace in chat message direct text', () => {
   });
   assert.equal(inspectCandidates([bubble]).sourceText(bubble), 'This is a question with extra whitespace');
 });
+
+test('inserts deepLocal user translation inside bubble before Copy controls', () => {
+  const original = element({
+    text: "What's a surprising fact about your city? Copy",
+    directText: "What's a surprising fact about your city?"
+  });
+  const actions = {};
+  const wrapper = {};
+  let inserted = null;
+  original.matches = selector => selector === '.message.user';
+  original.querySelector = selector => selector === '.messageActions' ? actions : null;
+  original.insertBefore = (node, reference) => { inserted = { node, reference }; };
+  original.insertAdjacentElement = () => { throw new Error('Translation escaped the bubble'); };
+
+  const instrumented = script.replace('  async function translate(options) {',
+    '  globalThis.__insertTranslation = insertTranslation;\n  async function translate(options) {');
+  const context = {
+    document: { getElementById() { return {}; } },
+    window: { innerHeight: 800 },
+    chrome: { runtime: { onMessage: { addListener() {} } } },
+    Intl,
+    console
+  };
+  vm.runInNewContext(instrumented, context);
+  context.__insertTranslation(original, wrapper);
+  assert.deepEqual(inserted, { node: wrapper, reference: actions });
+});
+
+test('preserves normal paragraph translation placement', () => {
+  const original = element({ text: 'A paragraph with enough text to translate.', tag: 'P' });
+  let placement = null;
+  original.insertAdjacentElement = (position, node) => { placement = { position, node }; };
+  const instrumented = script.replace('  async function translate(options) {',
+    '  globalThis.__insertTranslation = insertTranslation;\n  async function translate(options) {');
+  const context = {
+    document: { getElementById() { return {}; } },
+    window: { innerHeight: 800 },
+    chrome: { runtime: { onMessage: { addListener() {} } } },
+    Intl,
+    console
+  };
+  vm.runInNewContext(instrumented, context);
+  const wrapper = {};
+  context.__insertTranslation(original, wrapper);
+  assert.deepEqual(placement, { position: 'afterend', node: wrapper });
+});
