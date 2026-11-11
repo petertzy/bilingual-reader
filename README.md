@@ -113,3 +113,7 @@ Remembered OpenAI credentials are now encrypted in the extension popup using Web
 ## Password manager autofill
 
 The vault unlock form uses standard `username` and `current-password` autocomplete attributes so compatible password managers can offer to fill the vault passphrase. The account identifier is a non-secret, fixed label used only for matching. Chrome extension popup autofill is not supported by every password manager; manual fill or copy/paste remains available. The extension never saves the vault passphrase, and autofill does not bypass AES-GCM encryption or the 12-character minimum for creating a new vault. To use autofill, save the vault passphrase in your chosen password manager, not in the extension's local storage.
+
+## Saving a key separately from translation
+
+In Settings > OpenAI, enter a new API key, check **Remember encrypted key on this device**, enter a Vault passphrase of at least 12 characters, then click **Save encrypted API key**. The popup confirms when the encrypted key is saved. Reopening the popup intentionally leaves the API key input empty; the credential status indicates whether an encrypted key exists and whether it is unlocked for this session. Click **Unlock saved API key** with the passphrase after restarting the browser. **Translate page** no longer silently creates or overwrites the persistent encrypted credential; saving is an explicit action. The **Forget API Key** button removes saved and session credentials.
