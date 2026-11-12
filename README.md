@@ -76,6 +76,22 @@ For local development, set `DEEPLOCAL_OPUS_MT_PYTHON` to the Python executable
 with the required dependencies, then start the deepLocal server. The first
 translation in each direction loads the corresponding model into memory.
 
+### Long-page OPUS-MT behavior
+
+The floating **T** tab uses the same saved provider, target language, and
+loopback API URL as the extension popup. OPUS-MT requests are serialized to
+avoid overloading the local translation worker. Temporary network failures
+are retried up to two times with short delays. The reader prioritizes nearby
+content and skips common sidebar and recommendation containers for OPUS-MT,
+with a limit of 24 blocks and 70 segments per run. If a fatal error stops
+the run, pending placeholders are replaced with an explanatory message
+instead of remaining stuck on **Translating…**.
+
+For best results, start with the extension popup to save the desired provider,
+then use the **T** tab for subsequent pages. After updating the unpacked
+extension, reload it at `chrome://extensions` and refresh any open pages
+before using the **T** tab.
+
 ### OpenAI (optional cloud)
 
 **OpenAI sends the text being translated to an external API.** It is never an automatic fallback for local providers. API usage may incur charges.
