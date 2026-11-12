@@ -233,7 +233,7 @@
       try {
         const response = await chrome.runtime.sendMessage({ type: 'GET_TRANSLATION_PREFS' });
         if (!response?.ok) throw new Error(response?.error || 'Unable to load translation preferences.');
-        if (!response.settings?.model) throw new Error('Choose a model in extension settings.');
+        if (response.settings?.provider !== 'deeplocal-opus' && !response.settings?.model) throw new Error('Choose a model in extension settings.');
         clear();
         await translate(response.settings);
       } catch (error) {
