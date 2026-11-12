@@ -130,6 +130,24 @@ async function listModels(message) {
   return entries.filter(id => typeof id === 'string' && id.length <= 200 && id.trim());
 }
 
+async function translateOpusWithRetry(baseUrl, payload) {
+  const attempts = 3;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await fetchJson(`${baseUrl}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (error) {
+      const message = String(error?.message || error);
+      const transient = /Failed to fetch|network error|timed out|HTTP 502|HTTP 503|HTTP 504/i.test(message);
+      if (!transient || attempt === attempts - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, 350 * (attempt + 1)));
+    }
+  }
+}
+
 async function translate(message) {
   const text = typeof message.text === 'string' ? message.text.trim() : '';
   if (!text || text.length > MAX_INPUT) throw new Error('Invalid request or text too long.');
@@ -145,10 +163,8 @@ async function translate(message) {
     if (source === targetLanguage) {
       throw new Error('Source and target languages must differ for OPUS-MT.');
     }
-    const result = await fetchJson(`${baseUrl}/translate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, source_language: source, target_language: targetLanguage })
+    const result = await translateOpusWithRetry(baseUrl, {
+      text, source_language: source, target_language: targetLanguage
     });
     if (typeof result?.translation !== 'string' || !result.translation.trim()) {
       throw new Error('OPUS-MT returned no translation.');
@@ -198,12 +214,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const prefs = await chrome.storage.local.get([
         'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
       ]);
-      const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
+      const provider = ['ollama', 'deeplocal', 'deeplocal-opus', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
       return {
         provider,
         model: provider === 'deeplocal-opus' ? '' : provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : prefs.ollamaModel,
         target: prefs.target || 'en',
-        deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
+        deepLocalBaseUrl: ['deeplocal', 'deeplocal-opus'].includes(provider) ? (prefs.deepLocalBaseUrl || DEFAULT_DEEPLOCAL_BASE_URL) : undefined
       };
     })().then(settings => respond({ ok: true, settings }))
       .catch(() => respond({ ok: false, error: 'Unable to load translation preferences.' }));
