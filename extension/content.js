@@ -7,6 +7,8 @@
   const MAX_BLOCKS = 35;
   const MAX_CHARS = 3500;
   const MAX_TASKS = 120;
+  const OPUS_MAX_BLOCKS = 24;
+  const OPUS_MAX_TASKS = 70;
   const MAX_SEGMENT_CHARS = 600;
   const state = { running: false, generation: 0 };
   const excluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"]';
@@ -34,10 +36,12 @@
     return el.innerText?.trim() || '';
   }
 
-  function candidates() {
+  function candidates(provider) {
     return Array.from(document.querySelectorAll(textSelector))
       .filter(el => {
         if (el.closest(uiExcluded) || el.hasAttribute(MARK) || el.closest(`[${MARK}]`)) return false;
+        // Prioritize article content over recommendation lists and sidebars for OPUS-MT.
+        if (provider === 'deeplocal-opus' && el.closest('aside,[role="complementary"],[class*="sidebar"],[class*="Sidebar"],[class*="related"],[class*="Related"],[class*="popular"],[class*="Popular"]')) return false;
         if (el.closest('#sovereign-reader-quick-tab')) return false;
         if (!el.getClientRects().length) return false;
         const text = sourceText(el);
@@ -55,7 +59,7 @@
         const by = Math.abs(b.getBoundingClientRect().top - window.innerHeight * 0.35);
         return ay - by;
       })
-      .slice(0, MAX_BLOCKS);
+      .slice(0, provider === 'deeplocal-opus' ? OPUS_MAX_BLOCKS : MAX_BLOCKS);
   }
 
   function splitText(text) {
@@ -101,12 +105,13 @@
     state.running = true;
     const tasks = [];
     try {
-      const blocks = candidates().sort((a, b) => {
+      const blocks = candidates(options.provider).sort((a, b) => {
         const ay = Math.abs(a.getBoundingClientRect().top - window.innerHeight * 0.35);
         const by = Math.abs(b.getBoundingClientRect().top - window.innerHeight * 0.35);
         return ay - by;
       });
       if (!blocks.length) return;
+      const taskLimit = options.provider === 'deeplocal-opus' ? OPUS_MAX_TASKS : MAX_TASKS;
       for (const original of blocks) {
         const segments = splitText(sourceText(original));
         if (!segments.length) continue;
@@ -114,7 +119,7 @@
         const wrapper = translationNode('');
         insertTranslation(original, wrapper);
         for (const segment of segments) {
-          if (tasks.length >= MAX_TASKS) break;
+          if (tasks.length >= taskLimit) break;
           const line = document.createElement('div');
           line.textContent = 'Translating…';
           line.style.opacity = '0.65';
@@ -125,7 +130,7 @@
           wrapper.remove();
           original.removeAttribute(MARK);
         }
-        if (tasks.length >= MAX_TASKS) break;
+        if (tasks.length >= taskLimit) break;
       }
       const total = tasks.length;
       let next = 0;
@@ -133,7 +138,7 @@
       let failed = 0;
       let fatalError = '';
       let succeeded = 0;
-      const concurrency = options.provider === 'openai' ? 2 : 2;
+      const concurrency = options.provider === 'deeplocal-opus' ? 1 : 2;
       async function worker() {
         while (generation === state.generation && !fatalError) {
           const index = next++;
@@ -158,7 +163,7 @@
               task.line.textContent = `Translation failed: ${reason}`;
             }
             console.warn('[Sovereign Bilingual] Translation failed:', reason);
-            if (/HTTP 400|HTTP 401|HTTP 402|HTTP 403|HTTP 404|HTTP 429|Invalid OpenAI API key|Failed to fetch|network error/i.test(reason)) {
+            if (/HTTP 400|HTTP 401|HTTP 402|HTTP 403|HTTP 404|HTTP 429|Invalid OpenAI API key|Failed to fetch|network error|timed out/i.test(reason)) {
               fatalError = reason;
             }
           } finally {
@@ -169,6 +174,14 @@
         }
       }
       await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
+      if (fatalError && generation === state.generation) {
+        for (const task of tasks.slice(next)) {
+          if (task.line.isConnected) {
+            task.line.textContent = `Translation stopped: ${fatalError}`;
+            task.line.style.opacity = '1';
+          }
+        }
+      }
     } finally {
       if (generation === state.generation) state.running = false;
     }
