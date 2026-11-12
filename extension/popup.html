@@ -25,7 +25,7 @@
   <div id="advanced" hidden>
   <p class="note">Local-first translation. OpenAI sends page text to the cloud only when selected.</p>
   <label for="provider">Translation provider</label>
-  <select id="provider"><option value="ollama">Ollama</option><option value="deeplocal">deepLocal</option><option value="openai">OpenAI (cloud, opt-in)</option></select>
+  <select id="provider"><option value="ollama">Ollama</option><option value="deeplocal">deepLocal (LLM)</option><option value="deeplocal-opus">deepLocal (OPUS-MT)</option><option value="openai">OpenAI (cloud, opt-in)</option></select>
   <div id="deeplocal-settings" hidden>
     <label for="deeplocal-url">deepLocal API base URL</label>
     <input id="deeplocal-url" value="http://127.0.0.1:14567/v1" spellcheck="false" autocomplete="off">
@@ -48,10 +48,13 @@
     <button class="secondary" id="forget-api-key" type="button">Delete saved and active API key</button>
     <p class="note">Deletes the encrypted saved key, any legacy plaintext key, and the unlocked session key. A new key is required for OpenAI translation.</p>
   </div>
+  <p id="opus-note" class="note" hidden>OPUS-MT runs locally using models installed in deepLocal. Install the English/Chinese translation models in deepLocal first. No GGUF model is needed. Only English and Simplified Chinese are supported; source language is inferred from each text segment.</p>
+  <div id="model-settings">
   <label for="model">Model ID</label>
   <input id="model" list="model-list" value="gemma3:4b" spellcheck="false" autocomplete="off">
   <datalist id="model-list"></datalist>
   <button class="secondary" id="discover">Find local models</button>
+  </div>
   <label for="target">Target language</label>
   <select id="target">
     <option value="en">English</option>
