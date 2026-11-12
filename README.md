@@ -55,6 +55,27 @@ curl http://127.0.0.1:14567/v1/models
 
 Replace the port with the one shown by deepLocal. Avoid exposing local model services to the public network.
 
+### deepLocal OPUS-MT (local, experimental)
+
+The reader can use deepLocal's dedicated `POST /v1/translate` endpoint without
+loading a GGUF chat model. In **Settings**, select **deepLocal (OPUS-MT)**,
+enter the deepLocal Server page's API base URL, and choose **English** or
+**Chinese (Simplified)** as the target language. The extension infers the
+source direction for each segment from its script; mixed-language segments
+and other language pairs are not supported yet. Translation remains on the
+loopback interface and no model files are included with the extension.
+
+The endpoint currently requires the experimental deepLocal OPUS-MT feature,
+converted local models and a Python environment with CTranslate2 and
+SentencePiece. It does **not** automatically install models or the Python
+runtime. The deepLocal model-download UI must eventually handle installing,
+verifying, and deleting the converted translation models. Do not package the
+model weights in the desktop application or browser extension.
+
+For local development, set `DEEPLOCAL_OPUS_MT_PYTHON` to the Python executable
+with the required dependencies, then start the deepLocal server. The first
+translation in each direction loads the corresponding model into memory.
+
 ### OpenAI (optional cloud)
 
 **OpenAI sends the text being translated to an external API.** It is never an automatic fallback for local providers. API usage may incur charges.
