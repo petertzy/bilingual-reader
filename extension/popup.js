@@ -123,22 +123,28 @@ function validLocalBaseUrl(raw) {
 
 function settings() {
   const provider = providerInput.value;
-  const model = modelInput.value.trim();
-  if (!model || model.length > 200 || /[\u0000-\u001f\u007f]/.test(model)) {
+  const model = provider === 'deeplocal-opus' ? '' : modelInput.value.trim();
+  if (provider !== 'deeplocal-opus' && (!model || model.length > 200 || /[\u0000-\u001f\u007f]/.test(model))) {
     throw new Error('Select or enter a valid loaded model ID.');
   }
   return {
     provider, model, target: targetInput.value,
-    deepLocalBaseUrl: provider === 'deeplocal' ? validLocalBaseUrl(deepLocalInput.value) : undefined,
+    deepLocalBaseUrl: ['deeplocal', 'deeplocal-opus'].includes(provider) ? validLocalBaseUrl(deepLocalInput.value) : undefined,
     apiKey: provider === 'openai' ? apiKeyInput.value.trim() : undefined
   };
 }
 
 function toggleProvider() {
   const provider = providerInput.value;
-  deepLocalSettings.hidden = provider !== 'deeplocal';
+  deepLocalSettings.hidden = !['deeplocal', 'deeplocal-opus'].includes(provider);
+  document.getElementById('model-settings').hidden = provider === 'deeplocal-opus';
+  document.getElementById('opus-note').hidden = provider !== 'deeplocal-opus';
+  for (const option of targetInput.options) {
+    option.disabled = provider === 'deeplocal-opus' && !['en', 'zh-CN'].includes(option.value);
+  }
+  if (provider === 'deeplocal-opus' && !['en', 'zh-CN'].includes(targetInput.value)) targetInput.value = 'zh-CN';
   openAiSettings.hidden = provider !== 'openai';
-  discoverButton.hidden = provider === 'openai';
+  discoverButton.hidden = provider === 'openai' || provider === 'deeplocal-opus';
   modelInput.value = modelsByProvider[provider] || '';
   modelInput.placeholder = provider === 'deeplocal' ? 'Find or paste a loaded model ID' : provider === 'openai' ? 'gpt-4.1-mini' : 'gemma3:4b';
   modelList.replaceChildren();
@@ -179,7 +185,7 @@ storageReady.then(async () => {
     openai: prefs.openAiModel || 'gpt-4.1-mini'
   };
   deepLocalInput.value = prefs.deepLocalBaseUrl || DEFAULT_DEEPLOCAL_BASE_URL;
-  providerInput.value = ['deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
+  providerInput.value = ['deeplocal', 'deeplocal-opus', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
   rememberKeyInput.checked = Boolean(prefs.encryptedOpenAiApiKey);
   apiKeyInput.value = '';
   if (Array.from(targetInput.options).some(option => option.value === prefs.target)) targetInput.value = prefs.target;
