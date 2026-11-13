@@ -1,8 +1,8 @@
-# Sovereign Bilingual Reader
+# Bilingual Reader
 
 A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webpage translation. The current extension manifest version is **0.5.0**. It supports **Ollama**, **deepLocal**, and an optional **OpenAI** cloud backend. Original webpage text stays visible, with translations inserted below eligible paragraphs and list items.
 
-![Sovereign Bilingual Reader screenshot](https://github.com/user-attachments/assets/62dc0420-c891-47f5-9428-decff17d0d36)
+![Bilingual Reader screenshot](https://github.com/user-attachments/assets/62dc0420-c891-47f5-9428-decff17d0d36)
 
 ## Features
 
