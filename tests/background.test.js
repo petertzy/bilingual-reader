@@ -16,7 +16,9 @@ function createWorker(responder) {
   const context = {
     URL, AbortController, setTimeout, clearTimeout,
     chrome: {
-      runtime: { onMessage: { addListener(fn) { handler = fn; } } },
+      runtime: { onMessage: { addListener(fn) { handler = fn; } }, onInstalled: { addListener() {} } },
+      contextMenus: { onClicked: { addListener() {} } },
+      commands: { onCommand: { addListener() {} } },
       storage: {
         session: {
           async setAccessLevel(options) { accessLevels.push(['session', options.accessLevel]); },
@@ -94,22 +96,45 @@ test('model discovery reads Ollama model names', async () => {
   assert.equal(worker.calls[0].url, 'http://127.0.0.1:11434/api/tags');
 });
 
-test('deepLocal URL validation rejects remote hosts, local aliases, and other paths', async () => {
-  for (const url of [
-    'https://127.0.0.1:14567/v1',
-    'http://localhost:14567/v1',
-    'http://192.168.0.4:14567/v1',
-    'http://127.0.0.1:14567/runtime',
-    'http://127.0.0.1:14567/v1?redirect=1',
-    'http://127.0.0.1:14567@remote.example/v1'
-  ]) {
+test('deepLocal accepts explicit remote HTTP(S) endpoints', async () => {
+  for (const base of ['http://192.168.0.4:14567/v1', 'https://models.example.org/v1']) {
+    const worker = createWorker(() => ({ choices: [{ message: { content: 'Hello' } }] }));
+    const result = await worker.message({
+      type: 'TRANSLATE', provider: 'deeplocal', deepLocalBaseUrl: base,
+      model: 'remote-model', target: 'en', text: 'Hallo'
+    });
+    assert.equal(result.ok, true);
+    assert.equal(worker.calls[0].url, base + '/chat/completions');
+  }
+});
+
+test('Ollama accepts remote endpoints for discovery and translation', async () => {
+  const worker = createWorker(() => ({ models: [{ name: 'remote-model' }] }));
+  const result = await worker.message({
+    type: 'LIST_MODELS', provider: 'ollama', ollamaBaseUrl: 'http://192.168.0.5:11434'
+  }, false);
+  assert.equal(result.ok, true);
+  assert.equal(worker.calls[0].url, 'http://192.168.0.5:11434/api/tags');
+});
+
+test('provider URLs reject credentials, unexpected paths, and query strings', async () => {
+  const invalid = [
+    ['deeplocal', 'http://192.168.0.4:14567/runtime'],
+    ['deeplocal', 'http://192.168.0.4:14567/v1?redirect=1'],
+    ['deeplocal', 'http://user:pass@192.168.0.4:14567/v1'],
+    ['ollama', 'http://192.168.0.5:11434/api'],
+    ['ollama', 'http://192.168.0.5:11434/?token=x'],
+    ['ollama', 'file:///tmp/model']
+  ];
+  for (const [provider, base] of invalid) {
     const worker = createWorker(() => ({}));
     const result = await worker.message({
-      type: 'TRANSLATE', provider: 'deeplocal', deepLocalBaseUrl: url,
+      type: 'TRANSLATE', provider,
+      ollamaBaseUrl: base, deepLocalBaseUrl: base,
       model: 'local-model', target: 'en', text: 'Hello'
     });
-    assert.equal(result.ok, false, url);
-    assert.equal(worker.calls.length, 0, url);
+    assert.equal(result.ok, false, base);
+    assert.equal(worker.calls.length, 0, base);
   }
 });
 
