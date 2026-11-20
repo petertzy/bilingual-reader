@@ -212,6 +212,13 @@
       el.style.display = visible ? '' : 'none';
     });
     updateVisibilityButtons();
+    // Notify an open extension popup when the floating controls change state.
+    if (chrome.runtime?.id) {
+      chrome.runtime.sendMessage({
+        type: 'TRANSLATION_VISIBILITY_CHANGED',
+        visible: state.translationsVisible
+      }).catch(() => {});
+    }
   }
 
   let visibilityButtons = [];
