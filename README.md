@@ -10,7 +10,7 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 - Choose between local Ollama, local deepLocal, and explicitly selected OpenAI.
 - Select from **36 target-language options**, including Chinese (Simplified) and Chinese (Traditional), with English-only UI labels.
 - Use a compact extension popup; open **Settings** to choose a provider, model, and target language.
-- Use the floating **T** tab for **Translate page**, **Show translations**, **Hide translations**, and **Remove translations** actions.
+- Reveal or hide the floating **T** tab on demand with **Command+Shift+U** on macOS (**Ctrl+Shift+U** elsewhere). It is hidden by default and provides **Translate page**, **Show translations**, **Hide translations**, and **Remove translations** actions.
 - Translate selected words or sentences from the right-click **Translate selection** menu or a configurable keyboard shortcut; view results in a dismissible panel.
 - Process text progressively, prioritizing blocks near the reading viewport. Translation errors appear beside affected text.
 - Optionally encrypt a remembered OpenAI API key using a passphrase-protected vault.
@@ -24,17 +24,17 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 5. Click **Settings**, select a provider and model, choose a **Target language**, then click **Translate page**.
 6. Use **Remove translations** to clear inserted translations.
 
-After pulling updates, reload the extension from `chrome://extensions` and refresh the webpage. The extension does not run automatically on every visited page. Opening its popup on a normal webpage installs a small **T** tab for subsequent quick actions.
+After pulling updates, reload the extension from `chrome://extensions` and refresh the webpage. The extension does not run automatically on every visited page. Opening its popup on a normal webpage prepares the floating **T** tab, but it remains hidden until the user presses the tab-toggle shortcut.
 
 ## Reading and translation controls
 
 ### Translate a page
 
-Open the extension popup or the floating **T** tab on a regular webpage and choose **Translate page**. The extension translates eligible visible text blocks progressively, keeping the original text in place. Set the provider, model, and target language under **Settings** in the popup.
+Open the extension popup or reveal the floating **T** tab with **Command+Shift+U** (macOS) / **Ctrl+Shift+U** (other platforms) on a regular webpage and choose **Translate page**. The extension translates eligible visible text blocks progressively, keeping the original text in place. Set the provider, model, and target language under **Settings** in the popup.
 
 ### Hide, show, or remove translations
 
-The popup and floating **T** tab both provide these actions:
+The popup and floating **T** tab both provide these actions. The tab is hidden by default; press **Command+Shift+U** (macOS) or **Ctrl+Shift+U** (other platforms) to show it, and press the same shortcut again to hide it:
 
 | Action | Behavior |
 | --- | --- |
@@ -52,7 +52,7 @@ Visibility is a per-page state, not a saved preference across reloads. Newly ins
 
 The selected-text action uses the provider, model, and target language configured in the extension. It does not translate the entire page or add a persistent bilingual block. Selection requests have a **3,500-character limit**; errors are displayed in the panel.
 
-**Keyboard shortcut:** **Command+Shift+Y** (`⌘⇧Y`) on macOS, or **Ctrl+Shift+Y** on other platforms. These are defaults, not mandatory bindings. Change or disable the shortcut at `chrome://extensions/shortcuts` if it conflicts with another action. **Command+T** is normally reserved for opening a new tab in Chrome and is not the default.
+**Selected-text keyboard shortcut:** **Command+Shift+Y** (`⌘⇧Y`) on macOS, or **Ctrl+Shift+Y** on other platforms. These are defaults, not mandatory bindings. Change or disable either keyboard shortcut at `chrome://extensions/shortcuts` if it conflicts with another action. **Command+T** is normally reserved for opening a new tab in Chrome and is not the default.
 
 ## Translation providers
 
