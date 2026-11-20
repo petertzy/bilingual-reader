@@ -376,6 +376,37 @@ test('floating tab is hidden initially and the same command shows and hides it',
   assert.equal(host.style.display, 'none');
 });
 
+test('floating tab shortcut toggles the tab and ignores repeated keydown events', () => {
+  let keydown;
+  const host = { style: { display: 'none' } };
+  const document = {
+    getElementById() { return {}; },
+    addEventListener(type, listener) { if (type === 'keydown') keydown = listener; }
+  };
+  const instrumented = script.replace(
+    '  // A small, user-controlled tab provides translation without a persistent settings window.',
+    '  globalThis.__setQuickTabHost = host => { quickTabHost = host; };\\n  // A small, user-controlled tab provides translation without a persistent settings window.'
+  );
+  const context = {
+    document, window: { innerHeight: 800 },
+    chrome: { runtime: { onMessage: { addListener() {} } } },
+    Intl, console
+  };
+  vm.runInNewContext(instrumented, context);
+  context.__setQuickTabHost(host);
+  let prevented = 0;
+  const event = {
+    code: 'KeyU', metaKey: true, ctrlKey: false, shiftKey: true,
+    altKey: false, repeat: false, target: {},
+    preventDefault() { prevented++; }
+  };
+  keydown(event);
+  assert.equal(host.style.display, '');
+  keydown({ ...event, repeat: true });
+  assert.equal(host.style.display, '');
+  assert.equal(prevented, 1);
+});
+
 test('notifies extension popup when webpage translation visibility changes', () => {
   const messages = [];
   let listener;
