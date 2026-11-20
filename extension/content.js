@@ -12,7 +12,7 @@
   const excluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"]';
 
   // Include headings and text-only chat bubbles without translating controls or containers twice.
-  const textSelector = 'p, li, h1, h2, h3, h4, h5, h6, [role="heading"], div, span';
+  const textSelector = 'p, li, h1, h2, h3, h4, h5, h6, [role="heading"], div, span, h1 > a, h2 > a, h3 > a, h4 > a, h5 > a, h6 > a, [role="heading"] > a';
   const structuralText = 'p, li, h1, h2, h3, h4, h5, h6, [role="heading"]';
   const uiExcluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"],[role="button"],[role="toolbar"],[role="menu"],[role="menubar"],[role="tablist"],[role="textbox"],[aria-hidden="true"]';
 
@@ -50,7 +50,15 @@
     return parts.join('').replace(/\s+/g, ' ').trim();
   }
 
+  function isSeparateHeadingLink(el) {
+    const heading = el.parentElement;
+    if (!heading || !heading.matches(structuralText) || el.tagName !== 'A') return false;
+    const links = Array.from(heading.children).filter(child => child.tagName === 'A' && child.innerText?.trim());
+    return links.length > 1;
+  }
+
   function sourceText(el) {
+    if (isSeparateHeadingLink(el)) return structuralSourceText(el);
     if (el.matches(structuralText)) return structuralSourceText(el);
     const own = directText(el);
     if (own.length >= 25) return own;
@@ -65,13 +73,15 @@
       .filter(el => {
         if (el.closest(uiExcluded) || el.hasAttribute(MARK) || el.closest(`[${MARK}]`)) return false;
         if (el.closest('#sovereign-reader-quick-tab')) return false;
+        // Translate each linked subheading separately when a heading groups multiple links.
+        if (el.matches(structuralText) && Array.from(el.children).filter(child => child.tagName === 'A' && child.innerText?.trim()).length > 1) return false;
         if (!el.getClientRects().length) return false;
         const text = sourceText(el);
         // Semantic content remains eligible regardless of length. Generic
         // containers retain a minimum to avoid translating small UI labels.
-        const semantic = el.matches(structuralText);
+        const semantic = el.matches(structuralText) || isSeparateHeadingLink(el);
         if (!text || text.length > MAX_CHARS || (!semantic && text.length < 25)) return false;
-        if (!el.matches(structuralText)) {
+        if (!semantic) {
           const childWithText = Array.from(el.children).some(child =>
             child.innerText?.trim() && !child.matches('button, [role="button"], svg, img, [aria-hidden="true"]'));
           if (childWithText && directText(el).length < 25) return false;
