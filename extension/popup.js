@@ -121,10 +121,10 @@ function validProviderBaseUrl(raw, provider) {
   catch { throw new Error('Enter a valid API base URL.'); }
   if (!['http:', 'https:'].includes(url.protocol) || !url.hostname ||
       url.username || url.password || url.search || url.hash ||
-      /[\\u0000-\\u001f\\u007f]/.test(raw) || /%2f|%5c/i.test(url.pathname)) {
+      /[\u0000-\u001f\u007f]/.test(raw) || /%2f|%5c/i.test(url.pathname)) {
     throw new Error('Use an HTTP(S) URL without credentials, query, or fragment.');
   }
-  const path = url.pathname.replace(/\\/+$/, '');
+  const path = url.pathname.replace(/\/+$/, '');
   if (provider === 'deeplocal' && path !== '/v1') throw new Error('deepLocal API base URL must end with /v1.');
   if (provider === 'ollama' && path && path !== '/') throw new Error('Ollama API base URL must not include a path.');
   return url.origin + (provider === 'deeplocal' ? '/v1' : '');
