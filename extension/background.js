@@ -275,7 +275,7 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
   try {
     const [queriedTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const activeTab = queriedTab?.id ? queriedTab : tab;
-    if (!activeTab?.id || !/^https?:\/\//.test(activeTab.url || '')) return;
+    if (!activeTab?.id) return;
     if (command === 'toggle-quick-tab') {
       await chrome.scripting.executeScript({ target: { tabId: activeTab.id }, files: ['content.js'] });
       await chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_QUICK_TAB' });
