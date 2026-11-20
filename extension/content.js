@@ -8,7 +8,6 @@
   const MAX_CHARS = 3500;
   const MAX_TASKS = 120;
   const MAX_SEGMENT_CHARS = 600;
-  const MIN_HEADING_CHARS = 3;
   const state = { running: false, generation: 0 };
   const excluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"]';
 
@@ -68,11 +67,10 @@
         if (el.closest('#sovereign-reader-quick-tab')) return false;
         if (!el.getClientRects().length) return false;
         const text = sourceText(el);
-        // Short article headings are meaningful translation units even when
-        // they are much shorter than a paragraph or chat message.
-        const isHeading = el.matches('h1, h2, h3, h4, h5, h6, [role="heading"]');
-        const minimumLength = isHeading ? MIN_HEADING_CHARS : 25;
-        if (!text || text.length < minimumLength || text.length > MAX_CHARS) return false;
+        // Semantic content remains eligible regardless of length. Generic
+        // containers retain a minimum to avoid translating small UI labels.
+        const semantic = el.matches(structuralText);
+        if (!text || text.length > MAX_CHARS || (!semantic && text.length < 25)) return false;
         if (!el.matches(structuralText)) {
           const childWithText = Array.from(el.children).some(child =>
             child.innerText?.trim() && !child.matches('button, [role="button"], svg, img, [aria-hidden="true"]'));
