@@ -385,7 +385,7 @@ test('floating tab shortcut toggles the tab and ignores repeated keydown events'
   };
   const instrumented = script.replace(
     '  // A small, user-controlled tab provides translation without a persistent settings window.',
-    '  globalThis.__setQuickTabHost = host => { quickTabHost = host; };\\n  // A small, user-controlled tab provides translation without a persistent settings window.'
+    '  globalThis.__setQuickTabHost = host => { quickTabHost = host; };\n  // A small, user-controlled tab provides translation without a persistent settings window.'
   );
   const context = {
     document, window: { innerHeight: 800 },
