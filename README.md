@@ -10,7 +10,8 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 - Choose between local Ollama, local deepLocal, and explicitly selected OpenAI.
 - Select from **36 target-language options**, including Chinese (Simplified) and Chinese (Traditional), with English-only UI labels.
 - Use a compact extension popup; open **Settings** to choose a provider, model, and target language.
-- Use the floating **T** tab on a webpage for quick **Translate page** and **Remove translations** actions with saved preferences.
+- Use the floating **T** tab for **Translate page**, **Show translations**, **Hide translations**, and **Remove translations** actions.
+- Translate selected words or sentences from the right-click **Translate selection** menu or a configurable keyboard shortcut; view results in a dismissible panel.
 - Process text progressively, prioritizing blocks near the reading viewport. Translation errors appear beside affected text.
 - Optionally encrypt a remembered OpenAI API key using a passphrase-protected vault.
 
@@ -24,6 +25,34 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 6. Use **Remove translations** to clear inserted translations.
 
 After pulling updates, reload the extension from `chrome://extensions` and refresh the webpage. The extension does not run automatically on every visited page. Opening its popup on a normal webpage installs a small **T** tab for subsequent quick actions.
+
+## Reading and translation controls
+
+### Translate a page
+
+Open the extension popup or the floating **T** tab on a regular webpage and choose **Translate page**. The extension translates eligible visible text blocks progressively, keeping the original text in place. Set the provider, model, and target language under **Settings** in the popup.
+
+### Hide, show, or remove translations
+
+The popup and floating **T** tab both provide these actions:
+
+| Action | Behavior |
+| --- | --- |
+| **Hide translations** | Temporarily hides inserted translations while leaving the original webpage text visible. |
+| **Show translations** | Reveals the existing translations immediately, without requesting them again. |
+| **Remove translations** | Deletes inserted translation blocks and cancels pending page-translation work. |
+
+Visibility is a per-page state, not a saved preference across reloads. Newly inserted results from an ongoing page translation follow the current visibility setting. Removing translations is different from hiding them: after removal, use **Translate page** to generate results again.
+
+### Translate selected text
+
+1. Select a word, phrase, or sentence on an ordinary HTTP(S) webpage.
+2. Right-click and choose **Translate selection**, or press the configured keyboard shortcut.
+3. Read the result in the dismissible **Selected text translation** panel. Select **Close** to dismiss it.
+
+The selected-text action uses the provider, model, and target language configured in the extension. It does not translate the entire page or add a persistent bilingual block. Selection requests have a **3,500-character limit**; errors are displayed in the panel.
+
+**Keyboard shortcut:** **Command+Shift+Y** (`⌘⇧Y`) on macOS, or **Ctrl+Shift+Y** on other platforms. These are defaults, not mandatory bindings. Change or disable the shortcut at `chrome://extensions/shortcuts` if it conflicts with another action. **Command+T** is normally reserved for opening a new tab in Chrome and is not the default.
 
 ## Translation providers
 
@@ -126,21 +155,22 @@ Language names, UI, source code, comments, tests, and documentation remain Engli
 
 ## How translation works
 
-- The extension considers visible paragraphs and list items on ordinary webpages, prioritizing those near the reading viewport.
+- The extension considers visible semantic headings, paragraphs, and list items on ordinary webpages, prioritizing those near the reading viewport. Short semantic content is eligible; generic containers are filtered more conservatively.
 - It handles up to **35 eligible blocks** and **120 sentence-sized jobs** per run. Individual source blocks are limited to **3,500 characters**; longer sentences may be split into pieces of up to **600 characters**.
 - It runs up to **two concurrent translation requests** for each provider.
 - Original content stays visible. Translation output is added using `textContent`, not `innerHTML`.
+- Page translations can be hidden and restored without rerunning the model. Selected-text results use a separate dismissible panel.
 - Clicking **Remove translations** clears inserted results and invalidates pending work so stale results are not reinserted.
 - The compact interface does not show a persistent completion banner on the webpage. Errors appear beside the affected text.
 
 ## Permissions and privacy
 
-The manifest declares `activeTab`, `scripting`, and `storage`, with host permissions for `http://127.0.0.1/*` and `https://api.openai.com/*`. It does **not** request `<all_urls>`. Chrome host match patterns cannot restrict permissions to specific ports, so deepLocal addresses are additionally validated in code. Configured deepLocal URLs must use numeric `127.0.0.1`, an explicit port, and the `/v1` path. Requests reject HTTP redirects.
+The manifest declares `activeTab`, `scripting`, `storage`, and `contextMenus`, with host permissions for `http://127.0.0.1/*` and `https://api.openai.com/*`. It does **not** request `<all_urls>`. Chrome host match patterns cannot restrict permissions to specific ports, so deepLocal addresses are additionally validated in code. Configured deepLocal URLs must use numeric `127.0.0.1`, an explicit port, and the `/v1` path. Requests reject HTTP redirects.
 
 - No telemetry, external script CDN, user account, or extension-managed auto-update service is implemented.
 - Local providers receive source text through services running on the same machine.
 - OpenAI receives source text only when selected; cloud translation is not a silent fallback.
-- Webpage text is not intentionally persisted by the extension.
+- Webpage text, including selected text, is not intentionally persisted by the extension. The selected text is sent to the configured translation provider when translation is requested.
 - The deepLocal request explicitly disables optional document retrieval with `use_documents: false`.
 - API credentials are handled by trusted extension contexts, not exposed to webpage content scripts.
 
@@ -151,7 +181,9 @@ The manifest declares `activeTab`, `scripting`, and `storage`, with host permiss
 | Symptom | What to check |
 | --- | --- |
 | Settings or translation behaves inconsistently after updating | Reload the extension at `chrome://extensions` and refresh the webpage. |
-| No translation appears | Use a regular webpage with visible paragraph text; protected Chrome pages cannot be scripted. |
+| No translation appears | Use a regular webpage with eligible visible text; protected Chrome pages cannot be scripted. Check whether translations are hidden. |
+| Selected-text shortcut does nothing | Select text on a normal webpage and check the binding or conflicts at `chrome://extensions/shortcuts`. |
+| Selection translation fails | Confirm the configured provider is running or accessible, the selected text is within 3,500 characters, and the webpage allows extension scripts. |
 | No local models are found | Start the selected local service and load a model before clicking **Find local models**. |
 | deepLocal cannot connect | Copy the current loopback API URL from its **Server** page; the port may have changed. |
 | OpenAI asks for a key after restarting | An encrypted key must be unlocked with the vault passphrase for the new session. |
@@ -161,7 +193,8 @@ The manifest declares `activeTab`, `scripting`, and `storage`, with host permiss
 
 ## Limitations
 
-- The extension does not translate every element on a page; it processes a bounded set of eligible visible text blocks.
+- The extension does not translate every element on a page; it processes a bounded set of eligible visible text blocks. Generic UI containers and interactive controls are excluded.
+- Selection translation requires an eligible webpage and an explicit selection; protected Chrome pages cannot be scripted.
 - Automatic language detection, automatic page translation, PDF translation, OCR, speech recognition, and YouTube subtitle translation are not implemented.
 - Chrome internal and protected pages cannot be scripted.
 - Password-manager autofill support varies by manager and browser.
@@ -185,10 +218,3 @@ No npm install or build step is required.
 
 MIT. Original standalone starter code, not derived from BiRead or FluentRead.
 
-## Translate selected text
-
-Select a word or phrase on a webpage, right-click, and choose **Translate selection**. The translation appears in a small dismissible panel near the selection, without translating the entire page.
-
-The keyboard command **Translate selected text** defaults to **Command+Shift+Y** on macOS and **Ctrl+Shift+Y** on other platforms. Customize it at `chrome://extensions/shortcuts`. **Command+T** is reserved by Chrome for opening a new tab and generally cannot be reassigned to an extension.
-
-The selection uses the translation provider, model, and target language configured in the extension. It does not save selected text; the configured provider processes it as with normal page translation. The selection limit is 3,500 characters. This feature works on ordinary HTTP(S) webpages where the extension can run.
