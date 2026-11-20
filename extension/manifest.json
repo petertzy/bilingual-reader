@@ -38,5 +38,9 @@
       },
       "description": "Show or hide the floating translation tab"
     }
-  }
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ]
 }
