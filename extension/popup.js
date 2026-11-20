@@ -286,8 +286,12 @@ async function send(type) {
       await savePreferences();
     }
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) throw new Error('Open a normal website before using translation.');
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    if (!tab?.id) throw new Error('No active tab is available. Open a webpage and try again.');
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    } catch (error) {
+      throw new Error('Unable to access this tab. Open a regular website or check extension permissions. ' + error.message);
+    }
     const pageOptions = options ? {
       provider: options.provider, model: options.model, target: options.target,
       deepLocalBaseUrl: options.deepLocalBaseUrl, ollamaBaseUrl: options.ollamaBaseUrl
