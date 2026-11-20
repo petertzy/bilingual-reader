@@ -250,11 +250,15 @@
   // Keep the floating controls hidden until explicitly requested.
   let quickTabHost = null;
   let lastQuickTabToggle = 0;
-  function toggleQuickTab() {
-    // The browser command and the page-level fallback may fire for one keypress.
+  let lastQuickTabSource = '';
+  function toggleQuickTab(source = 'command') {
+    // Avoid toggling twice when one keypress reaches both the browser and page handlers.
     const now = Date.now();
-    if (now - lastQuickTabToggle < 400) return quickTabHost?.style.display !== 'none';
+    if (source !== lastQuickTabSource && now - lastQuickTabToggle < 400) {
+      return quickTabHost?.style.display !== 'none';
+    }
     lastQuickTabToggle = now;
+    lastQuickTabSource = source;
     if (!quickTabHost) installQuickTab();
     if (!quickTabHost) return false;
     const visible = quickTabHost.style.display === 'none';
@@ -396,7 +400,7 @@
     if (event.altKey || !(event.metaKey || event.ctrlKey)) return;
     if (event.target?.closest?.('input,textarea,select,[contenteditable]')) return;
     event.preventDefault();
-    toggleQuickTab();
+    toggleQuickTab('keyboard');
   });
 
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
