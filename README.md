@@ -68,7 +68,26 @@ The selected-text action uses the provider, model, and target language configure
 
 Model discovery uses `GET /api/tags`; translation uses `POST /api/chat`. The Ollama base URL must contain only the scheme, host, and optional port (no `/api` suffix). Model quality and language coverage vary.
 
-**HTTP 403 from the browser extension:** If Ollama works from PowerShell but translation reports HTTP 403, Ollama may be rejecting the Chrome extension origin. The extension now includes its exact `chrome-extension://<extension-id>` origin in the error message. On Windows, quit Ollama completely, set `OLLAMA_ORIGINS` to include that exact origin (preserving any other required origins), then restart Ollama. For example, run `[Environment]::SetEnvironmentVariable('OLLAMA_ORIGINS', 'chrome-extension://<extension-id>', 'User')` in PowerShell after replacing the placeholder with the extension ID. Restart the Ollama desktop application so it inherits the new environment variable. A successful PowerShell `/api/chat` request does not establish that browser-extension origin access is allowed. Do not disable browser security or expose Ollama on a public interface to work around this error.
+**HTTP 403 from the browser extension:** A successful PowerShell or terminal `/api/chat` call does not guarantee that Ollama allows requests originating from Chrome extensions. If translation fails with HTTP 403, the extension error displays its exact `chrome-extension://<extension-id>` origin. Allow that origin in `OLLAMA_ORIGINS` on the computer running Ollama, then **fully quit and restart Ollama**. Use the ID displayed by your own extension; it may differ between Windows and macOS.
+
+**Windows (PowerShell):**
+
+```powershell
+$origin = 'chrome-extension://REPLACE_WITH_YOUR_EXTENSION_ID'
+[Environment]::SetEnvironmentVariable('OLLAMA_ORIGINS', $origin, 'User')
+```
+
+Quit Ollama from the system tray, ensure its old server process has exited, and launch Ollama again from the Start menu. If `OLLAMA_ORIGINS` was already set for other clients, preserve the existing required origins instead of overwriting them.
+
+**macOS (Terminal, Ollama desktop app):**
+
+```sh
+launchctl setenv OLLAMA_ORIGINS 'chrome-extension://REPLACE_WITH_YOUR_EXTENSION_ID'
+```
+
+Quit Ollama completely using the menu bar icon, then reopen the Ollama app. `launchctl setenv` configures the current login session; it may need to be reapplied after signing out or restarting macOS. For a persistent setup, configure the environment for the process that launches Ollama, rather than assuming the terminal's shell environment is inherited by the desktop app.
+
+**Security:** Prefer the exact extension origin over a wildcard such as `chrome-extension://*`. Changing `OLLAMA_ORIGINS` expands which browser origins can call your local Ollama service; it does not require exposing Ollama to the network. A 403 can also have other causes, so treat origin restrictions as a likely diagnosis rather than a certainty.
 
 ### deepLocal (local)
 
