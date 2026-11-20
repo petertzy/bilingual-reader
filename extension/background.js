@@ -204,3 +204,73 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   });
   return true;
 });
+
+const SELECTION_MENU_ID = 'sovereign-translate-selection';
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: SELECTION_MENU_ID,
+    title: 'Translate selection',
+    contexts: ['selection']
+  }, () => {
+    if (chrome.runtime.lastError) console.warn('[Sovereign Bilingual] Context menu:', chrome.runtime.lastError.message);
+  });
+});
+
+async function selectedTextSettings() {
+  await secureStorageReady;
+  const prefs = await chrome.storage.local.get([
+    'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
+  ]);
+  const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
+  return {
+    provider,
+    model: provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : (prefs.ollamaModel || 'gemma3:4b'),
+    target: prefs.target || 'en',
+    deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
+  };
+}
+
+async function translateSelection(tabId, rawText) {
+  const text = typeof rawText === 'string' ? rawText.trim() : '';
+  if (!text) return;
+  await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+  const notify = async payload => {
+    await chrome.tabs.sendMessage(tabId, { type: 'SELECTION_TRANSLATION', ...payload });
+  };
+  if (text.length > MAX_INPUT) {
+    await notify({ error: 'Selection is too long. Select up to 3,500 characters.' });
+    return;
+  }
+  await notify({ pending: true, source: text });
+  try {
+    const settings = await selectedTextSettings();
+    if (!settings.model) throw new Error('Choose a model in extension settings.');
+    const translation = await translate({ ...settings, text });
+    await notify({ source: text, translation });
+  } catch (error) {
+    await notify({ source: text, error: String(error.message || error).slice(0, 240) });
+  }
+}
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== SELECTION_MENU_ID || !tab?.id || !/^https?:\/\//.test(tab.url || '')) return;
+  translateSelection(tab.id, info.selectionText).catch(error =>
+    console.warn('[Sovereign Bilingual] Selection translation failed:', error.message));
+});
+
+chrome.commands.onCommand.addListener(async (command, tab) => {
+  if (command !== 'translate-selection') return;
+  try {
+    const activeTab = tab?.id ? tab : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    if (!activeTab?.id || !/^https?:\/\//.test(activeTab.url || '')) return;
+    const [{ result: selection }] = await chrome.scripting.executeScript({
+      target: { tabId: activeTab.id },
+      func: () => window.getSelection()?.toString() || ''
+    });
+    if (!selection?.trim()) return;
+    await translateSelection(activeTab.id, selection);
+  } catch (error) {
+    console.warn('[Sovereign Bilingual] Shortcut translation failed:', error.message);
+  }
+});
