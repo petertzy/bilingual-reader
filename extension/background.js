@@ -173,11 +173,9 @@ async function translate(message) {
   } catch (error) {
     if (provider === 'ollama' && String(error.message || error).startsWith('HTTP 403')) {
       throw new Error(
-        'Ollama rejected the extension request (HTTP 403). The browser extension origin may not be allowed. ' +
-        'Allow chrome-extension://' + chrome.runtime.id + ' in OLLAMA_ORIGINS, then fully restart Ollama. ' +
-        'Windows: set the user environment variable and restart the desktop app. ' +
-        'macOS: run launchctl setenv OLLAMA_ORIGINS with this origin, then restart the desktop app. ' +
-        'Original error: ' + String(error.message || error)
+        'Ollama HTTP 403: allow chrome-extension://' + chrome.runtime.id +
+        ' in OLLAMA_ORIGINS. Windows: set user env var. macOS: use launchctl setenv. ' +
+        'Fully restart Ollama. See README for steps.'
       );
     }
     throw error;
