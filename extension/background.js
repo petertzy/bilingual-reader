@@ -49,22 +49,24 @@ const secureStorageReady = Promise.all([
   chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
 ]);
 
-function validateLocalBaseUrl(raw) {
-  if (typeof raw !== 'string' || raw.length > 180) throw new Error('Invalid deepLocal address.');
+function validateProviderBaseUrl(raw, provider) {
+  const label = provider === 'ollama' ? 'Ollama' : 'deepLocal';
+  if (typeof raw !== 'string' || !raw.trim() || raw.length > 300 ||
+      /[\u0000-\u0020\u007f]/.test(raw.trim())) {
+    throw new Error(`Enter a valid ${label} API base URL.`);
+  }
   let url;
-  try {
-    url = new URL(raw.trim());
-  } catch {
-    throw new Error('Enter a valid deepLocal local API URL.');
-  }
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' ||
-      !url.port || !/^\d{1,5}$/.test(url.port) ||
-      Number(url.port) < 1 || Number(url.port) > 65535 ||
+  try { url = new URL(raw.trim()); }
+  catch { throw new Error(`Enter a valid ${label} API base URL.`); }
+  const path = provider === 'ollama' ? ['', '/'] : ['/v1', '/v1/'];
+  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname ||
       url.username || url.password || url.search || url.hash ||
-      !['/v1', '/v1/'].includes(url.pathname)) {
-    throw new Error('deepLocal must use http://127.0.0.1:<port>/v1.');
+      !path.includes(url.pathname)) {
+    throw new Error(provider === 'ollama'
+      ? 'Ollama URL must be an HTTP(S) origin without a path.'
+      : 'deepLocal URL must be an HTTP(S) origin ending in /v1.');
   }
-  return `${url.origin}/v1`;
+  return provider === 'ollama' ? url.origin : `${url.origin}/v1`;
 }
 
 function validateModel(raw) {
@@ -83,10 +85,10 @@ function validateOpenAiApiKey(raw) {
 
 function selectBackend(message) {
   if (message.provider === 'ollama') {
-    return { provider: 'ollama', baseUrl: OLLAMA_BASE_URL };
+    return { provider: 'ollama', baseUrl: validateProviderBaseUrl(message.ollamaBaseUrl || OLLAMA_BASE_URL, 'ollama') };
   }
   if (message.provider === 'deeplocal') {
-    return { provider: 'deeplocal', baseUrl: validateLocalBaseUrl(message.deepLocalBaseUrl) };
+    return { provider: 'deeplocal', baseUrl: validateProviderBaseUrl(message.deepLocalBaseUrl || DEFAULT_DEEPLOCAL_BASE_URL, 'deeplocal') };
   }
   if (message.provider === 'openai') {
     return { provider: 'openai', baseUrl: OPENAI_BASE_URL };
@@ -174,14 +176,16 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     (async () => {
       await secureStorageReady;
       const prefs = await chrome.storage.local.get([
-        'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
+        'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'ollamaBaseUrl', 'deepLocalBaseUrl', 'target'
       ]);
       const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
       return {
         provider,
         model: provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : prefs.ollamaModel,
         target: prefs.target || 'en',
-        deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
+        ollamaBaseUrl: provider === 'ollama' ? prefs.ollamaBaseUrl : undefined,
+        ollamaBaseUrl: provider === 'ollama' ? prefs.ollamaBaseUrl : undefined,
+    deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
       };
     })().then(settings => respond({ ok: true, settings }))
       .catch(() => respond({ ok: false, error: 'Unable to load translation preferences.' }));
