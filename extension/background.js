@@ -231,18 +231,20 @@ async function selectedTextSettings() {
   };
 }
 
+let selectionRequestSequence = 0;
 async function translateSelection(tabId, rawText) {
   const text = typeof rawText === 'string' ? rawText.trim() : '';
   if (!text) return;
+  const requestId = ++selectionRequestSequence;
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
   const notify = async payload => {
-    await chrome.tabs.sendMessage(tabId, { type: 'SELECTION_TRANSLATION', ...payload });
+    await chrome.tabs.sendMessage(tabId, { type: 'SELECTION_TRANSLATION', requestId, ...payload });
   };
+  await notify({ pending: true, source: text });
   if (text.length > MAX_INPUT) {
     await notify({ error: 'Selection is too long. Select up to 3,500 characters.' });
     return;
   }
-  await notify({ pending: true, source: text });
   try {
     const settings = await selectedTextSettings();
     if (!settings.model) throw new Error('Choose a model in extension settings.');
