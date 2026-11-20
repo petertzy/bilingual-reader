@@ -108,10 +108,15 @@ async function fetchJson(url, options = {}) {
     const response = await fetch(url, { ...options, redirect: 'error', signal: controller.signal });
     if (!response.ok) {
       let details = '';
+      const rawBody = await response.text();
+
       try {
-        const body = await response.json();
-        details = String(body?.error?.message || body?.message || '').slice(0, 240);
-      } catch { /* Preserve HTTP status if response body is not JSON. */ }
+        const body = JSON.parse(rawBody);
+        details = String(body?.error?.message || body?.message || rawBody).slice(0, 240);
+      } catch {
+        details = rawBody.slice(0, 240);
+      }
+
       throw new Error(`HTTP ${response.status}${details ? `: ${details}` : ''}`);
     }
     return await response.json();
