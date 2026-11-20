@@ -36,6 +36,8 @@ function selectCandidates(elements) {
 
 function element({ text, tag = 'DIV', parent = '', children = [], visible = true, directText = null }) {
   return {
+    nodeType: 1,
+    tagName: tag,
     innerText: text,
     children,
     childNodes: [{ nodeType: 3, textContent: directText === null ? (children.length ? '' : text) : directText }],
@@ -217,4 +219,26 @@ test('normalizes whitespace across inline text and line breaks', () => {
   ]);
   const { sourceText } = inspectCandidates([]);
   assert.equal(sourceText(paragraph), 'An array of tagged instances can be injected.');
+});
+
+test('selects a short linked article heading for translation', () => {
+  const heading = element({ text: 'Binding Primitives', tag: 'H2' });
+  heading.childNodes = [domNode('A', [textNode('Binding Primitives')])];
+  const { candidates, sourceText } = inspectCandidates([heading]);
+  assert.deepEqual(candidates, [heading]);
+  assert.equal(sourceText(heading), 'Binding Primitives');
+});
+
+test('selects a short role heading while keeping ordinary short text excluded', () => {
+  const heading = element({ text: 'Quick Start', tag: 'DIV' });
+  heading.matches = selector => selector.includes('[role="heading"]');
+  const paragraph = element({ text: 'Quick Start', tag: 'P' });
+  const shortLabel = element({ text: 'Quick Start', tag: 'SPAN' });
+  const { candidates } = inspectCandidates([heading, paragraph, shortLabel]);
+  assert.deepEqual(candidates, [heading]);
+});
+
+test('rejects trivial headings below the minimum length', () => {
+  const heading = element({ text: 'A', tag: 'H3' });
+  assert.deepEqual(selectCandidates([heading]), []);
 });
