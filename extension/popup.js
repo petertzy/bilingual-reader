@@ -371,7 +371,7 @@ document.getElementById('toggle-floating-tab').addEventListener('click', async (
   status.textContent = '';
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !/^https?:\\/\\//.test(tab.url || '')) {
+    if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) {
       throw new Error('Open a normal webpage before toggling the floating tab.');
     }
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
