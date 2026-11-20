@@ -288,3 +288,33 @@ test('hides and restores existing translations without clearing their text', () 
   assert.equal(first.textContent, 'First translation');
   assert.equal(second.textContent, 'Second translation');
 });
+
+test('translation blocks use no decorative left border', () => {
+  const created = [];
+  const document = {
+    getElementById() { return {}; },
+    createElement(tagName) {
+      const node = {
+        tagName,
+        style: {},
+        setAttribute(name, value) { this[name] = value; }
+      };
+      created.push(node);
+      return node;
+    }
+  };
+  const context = {
+    document,
+    window: { innerHeight: 800 },
+    chrome: { runtime: { onMessage: { addListener() {} } } },
+    Intl,
+    console
+  };
+  const instrumented = script.replace('  function translationNode(text) {',
+    '  globalThis.__makeTranslation = text => translationNode(text);\n  function translationNode(text) {');
+  vm.runInNewContext(instrumented, context);
+  const translation = context.__makeTranslation('Translated paragraph');
+  assert.equal(translation.textContent, 'Translated paragraph');
+  assert.doesNotMatch(translation.style.cssText, /border-left\s*:/i);
+  assert.match(translation.style.cssText, /background:/);
+});
