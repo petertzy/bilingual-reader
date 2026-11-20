@@ -16,7 +16,7 @@ function createWorker(responder) {
   const context = {
     URL, AbortController, setTimeout, clearTimeout,
     chrome: {
-      runtime: { onMessage: { addListener(fn) { handler = fn; } }, onInstalled: { addListener() {} } },
+      runtime: { id: 'test-extension-id', onMessage: { addListener(fn) { handler = fn; } }, onInstalled: { addListener() {} } },
       contextMenus: { onClicked: { addListener() {} } },
       commands: { onCommand: { addListener() {} } },
       storage: {
@@ -33,7 +33,11 @@ function createWorker(responder) {
     },
     fetch: async (url, options = {}) => {
       calls.push({ url, options });
-      return { ok: true, json: async () => responder(url, options) };
+      const result = responder(url, options);
+      if (result && result.__httpError) {
+        return { ok: false, status: result.status, text: async () => result.body || '' };
+      }
+      return { ok: true, json: async () => result };
     }
   };
   vm.runInNewContext(script, context, { filename: 'background.js' });
@@ -65,6 +69,18 @@ test('deepLocal translation uses the OpenAI-compatible endpoint and disables doc
   assert.equal(body.use_documents, false);
   assert.equal(body.stream, false);
   assert.equal(body.model, 'my-gguf-model');
+});
+
+test('Ollama HTTP 403 identifies extension origin configuration', async () => {
+  const worker = createWorker(() => ({ __httpError: true, status: 403, body: 'Forbidden' }));
+  const result = await worker.message({
+    type: 'TRANSLATE', provider: 'ollama', model: 'gemma4:e2b-it-qat',
+    target: 'zh-CN', text: 'Good morning'
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /OLLAMA_ORIGINS/);
+  assert.match(result.error, /chrome-extension:\/\/test-extension-id/);
+  assert.match(result.error, /HTTP 403/);
 });
 
 test('Ollama keeps its own native chat API and model format', async () => {
