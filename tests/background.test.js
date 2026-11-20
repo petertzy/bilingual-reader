@@ -81,6 +81,9 @@ test('Ollama HTTP 403 identifies extension origin configuration', async () => {
   assert.match(result.error, /OLLAMA_ORIGINS/);
   assert.match(result.error, /chrome-extension:\/\/test-extension-id/);
   assert.match(result.error, /HTTP 403/);
+  assert.match(result.error, /Windows/);
+  assert.match(result.error, /macOS/);
+  assert.ok(result.error.length <= 240, 'The guidance must fit the page error display limit.');
 });
 
 test('Ollama keeps its own native chat API and model format', async () => {
