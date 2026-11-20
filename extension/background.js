@@ -58,11 +58,11 @@ function validateProviderBaseUrl(raw, provider) {
   catch { throw new Error('Enter a valid API base URL.'); }
   if (!['http:', 'https:'].includes(url.protocol) || !url.hostname ||
       url.username || url.password || url.search || url.hash ||
-      /[\\u0000-\\u001f\\u007f]/.test(raw) ||
+      /[\u0000-\u001f\u007f]/.test(raw) ||
       /%2f|%5c/i.test(url.pathname)) {
     throw new Error('Use an HTTP(S) URL without credentials, query, or fragment.');
   }
-  const path = url.pathname.replace(/\\/+$/, '');
+  const path = url.pathname.replace(/\/+$/, '');
   if (provider === 'deeplocal') {
     if (path !== '/v1') throw new Error('deepLocal API base URL must end with /v1.');
     return url.origin + '/v1';
