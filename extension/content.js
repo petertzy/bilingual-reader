@@ -384,7 +384,8 @@
     } else if (message?.type === 'START') {
       translate({
         provider: message.provider, model: message.model,
-        target: message.target, deepLocalBaseUrl: message.deepLocalBaseUrl
+        target: message.target, deepLocalBaseUrl: message.deepLocalBaseUrl,
+        ollamaBaseUrl: message.ollamaBaseUrl
       }).catch(error => console.warn('[Sovereign Bilingual] Translation run failed:', error.message));
       respond({ ok: true, started: true });
     } else if (message?.type === 'SHOW_TRANSLATIONS' || message?.type === 'HIDE_TRANSLATIONS') {
