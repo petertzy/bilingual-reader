@@ -7,7 +7,8 @@
     "activeTab",
     "scripting",
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "permissions"
   ],
   "host_permissions": [
     "http://127.0.0.1/*",
@@ -38,5 +39,9 @@
       },
       "description": "Show or hide the floating translation tab"
     }
-  }
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ]
 }
