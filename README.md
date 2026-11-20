@@ -184,3 +184,11 @@ No npm install or build step is required.
 ## License
 
 MIT. Original standalone starter code, not derived from BiRead or FluentRead.
+
+## Translate selected text
+
+Select a word or phrase on a webpage, right-click, and choose **Translate selection**. The translation appears in a small dismissible panel near the selection, without translating the entire page.
+
+The keyboard command **Translate selected text** defaults to **Command+Shift+Y** on macOS and **Ctrl+Shift+Y** on other platforms. Customize it at `chrome://extensions/shortcuts`. **Command+T** is reserved by Chrome for opening a new tab and generally cannot be reassigned to an extension.
+
+The selection uses the translation provider, model, and target language configured in the extension. It does not save selected text; the configured provider processes it as with normal page translation. The selection limit is 3,500 characters. This feature works on ordinary HTTP(S) webpages where the extension can run.
