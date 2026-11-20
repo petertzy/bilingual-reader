@@ -56,6 +56,8 @@ The selected-text action uses the provider, model, and target language configure
 
 **Selected-text keyboard shortcut:** **Command+Shift+Y** (`⌘⇧Y`) on macOS, or **Ctrl+Shift+Y** on other platforms. These are defaults, not mandatory bindings. Both shortcuts are configurable at `chrome://extensions/shortcuts`; change or disable either one if it conflicts with another action. **Command+T** is normally reserved for opening a new tab in Chrome and is not the default.
 
+The popup also includes **Show or hide floating T tab**, which toggles the tab without a keyboard shortcut. It displays the shortcut Chrome currently has assigned. If it says no shortcut is assigned, open `chrome://extensions/shortcuts`, find **Sovereign Bilingual Reader**, and assign a key combination to **Show or hide the floating translation tab**. Chrome can leave suggested shortcuts unassigned due to conflicts, and some browser-reserved combinations cannot be overridden. After updating the unpacked extension, reload it and refresh the webpage.
+
 ## Translation providers
 
 ### Ollama (local)
