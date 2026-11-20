@@ -356,42 +356,6 @@ chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
   }
 }).catch(() => {});
 
-async function refreshFloatingTabShortcut() {
-  const label = document.getElementById('floating-tab-shortcut');
-  try {
-    const commands = await chrome.commands.getAll();
-    const command = commands.find(item => item.name === 'toggle-quick-tab');
-    if (command?.shortcut) {
-      label.textContent = 'Floating tab shortcut: ' + command.shortcut + '.';
-    } else {
-      label.textContent = 'Floating tab shortcut is not assigned. Set it at chrome://extensions/shortcuts.';
-    }
-  } catch {
-    label.textContent = 'Check the floating tab shortcut at chrome://extensions/shortcuts.';
-  }
-}
-
-document.getElementById('toggle-floating-tab').addEventListener('click', async () => {
-  status.textContent = '';
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) {
-      throw new Error('Open a normal webpage before toggling the floating tab.');
-    }
-    try {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-    } catch (error) {
-      throw new Error('This tab does not allow extension controls. Open a regular website (not a Chrome new tab or internal page). ' + error.message);
-    }
-    const result = await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_QUICK_TAB' });
-    if (!result?.ok) throw new Error('The webpage did not respond.');
-    status.textContent = result.visible ? 'Floating tab shown.' : 'Floating tab hidden.';
-  } catch (error) {
-    status.textContent = 'Unable to toggle floating tab: ' + error.message;
-  }
-});
-refreshFloatingTabShortcut();
-
 document.getElementById('start').addEventListener('click', () => send('START'));
 document.getElementById('clear').addEventListener('click', () => send('CLEAR'));
 
