@@ -347,3 +347,35 @@ test('floating tab is hidden initially and the same command shows and hides it',
   assert.equal(toggle().visible, false);
   assert.equal(host.style.display, 'none');
 });
+
+test('notifies extension popup when webpage translation visibility changes', () => {
+  const messages = [];
+  let listener;
+  const document = {
+    getElementById() { return {}; },
+    querySelectorAll() { return []; }
+  };
+  const context = {
+    document,
+    window: { innerHeight: 800 },
+    chrome: {
+      runtime: {
+        id: 'test-extension',
+        sendMessage(message) {
+          messages.push(message);
+          return Promise.resolve();
+        },
+        onMessage: { addListener(fn) { listener = fn; } }
+      }
+    },
+    Intl,
+    console
+  };
+  vm.runInNewContext(script, context);
+  listener({ type: 'HIDE_TRANSLATIONS' }, null, () => {});
+  listener({ type: 'SHOW_TRANSLATIONS' }, null, () => {});
+  assert.deepEqual(messages.map(message => [message.type, message.visible]), [
+    ['TRANSLATION_VISIBILITY_CHANGED', false],
+    ['TRANSLATION_VISIBILITY_CHANGED', true]
+  ]);
+});
