@@ -212,6 +212,13 @@
       el.style.display = visible ? '' : 'none';
     });
     updateVisibilityButtons();
+    // Notify an open extension popup when the floating controls change state.
+    if (chrome.runtime?.id) {
+      chrome.runtime.sendMessage({
+        type: 'TRANSLATION_VISIBILITY_CHANGED',
+        visible: state.translationsVisible
+      }).catch(() => {});
+    }
   }
 
   let visibilityButtons = [];
@@ -230,12 +237,22 @@
   }
 
 
+  // Keep the floating controls hidden until explicitly requested.
+  let quickTabHost = null;
+  function toggleQuickTab() {
+    if (!quickTabHost) installQuickTab();
+    if (!quickTabHost) return false;
+    const visible = quickTabHost.style.display === 'none';
+    quickTabHost.style.display = visible ? '' : 'none';
+    return visible;
+  }
+
   // A small, user-controlled tab provides translation without a persistent settings window.
   function installQuickTab() {
     if (document.getElementById('sovereign-reader-quick-tab')) return;
     const host = document.createElement('div');
     host.id = 'sovereign-reader-quick-tab';
-    host.style.cssText = 'position:fixed;right:0;top:42%;z-index:2147483647;';
+    host.style.cssText = 'position:fixed;right:0;top:42%;z-index:2147483647;display:none;';
     const root = host.attachShadow({ mode: 'closed' });
     const style = document.createElement('style');
     style.textContent = `
@@ -311,6 +328,7 @@
       clear(); panel.hidden = true;
     });
     document.documentElement.append(host);
+    quickTabHost = host;
   }
 
 
@@ -358,7 +376,9 @@
   installQuickTab();
 
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
-    if (message?.type === 'SELECTION_TRANSLATION') {
+    if (message?.type === 'TOGGLE_QUICK_TAB') {
+      respond({ ok: true, visible: toggleQuickTab() });
+    } else if (message?.type === 'SELECTION_TRANSLATION') {
       showSelectionTranslation(message);
       respond({ ok: true });
     } else if (message?.type === 'START') {

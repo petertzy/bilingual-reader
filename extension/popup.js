@@ -356,11 +356,25 @@ async function toggleTranslationVisibility(visible) {
 document.getElementById('show-translations').addEventListener('click', () => toggleTranslationVisibility(true));
 document.getElementById('hide-translations').addEventListener('click', () => toggleTranslationVisibility(false));
 
-chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
-  if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) return;
+async function refreshTranslationVisibility() {
   try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) return;
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
     const result = await chrome.tabs.sendMessage(tab.id, { type: 'GET_TRANSLATION_VISIBILITY' });
     if (result?.ok) await updateTranslationVisibility(result.visible);
   } catch { /* Ignore restricted pages and tabs without the content script. */ }
-}).catch(() => {});
+}
+
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (message?.type !== 'TRANSLATION_VISIBILITY_CHANGED' || !sender.tab?.id) return;
+  chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+    if (tab?.id === sender.tab.id) updateTranslationVisibility(message.visible);
+  }).catch(() => {});
+});
+
+window.addEventListener('focus', refreshTranslationVisibility);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshTranslationVisibility();
+});
+refreshTranslationVisibility();

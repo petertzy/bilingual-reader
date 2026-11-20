@@ -10,7 +10,7 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 - Choose between local Ollama, local deepLocal, and explicitly selected OpenAI.
 - Select from **36 target-language options**, including Chinese (Simplified) and Chinese (Traditional), with English-only UI labels.
 - Use a compact extension popup; open **Settings** to choose a provider, model, and target language.
-- Use the floating **T** tab for **Translate page**, **Show translations**, **Hide translations**, and **Remove translations** actions.
+- Keep the floating **T** tab hidden until needed; toggle it with **Command+Shift+U** on macOS (**Ctrl+Shift+U** elsewhere). Its controls offer **Translate page**, **Show translations**, **Hide translations**, and **Remove translations**. The popup and floating controls stay synchronized when translation visibility changes.
 - Translate selected words or sentences from the right-click **Translate selection** menu or a configurable keyboard shortcut; view results in a dismissible panel.
 - Process text progressively, prioritizing blocks near the reading viewport. Translation errors appear beside affected text.
 - Optionally encrypt a remembered OpenAI API key using a passphrase-protected vault.
@@ -22,25 +22,27 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 3. Click **Load unpacked** and select this repository's `extension/` directory.
 4. Open a normal `http://` or `https://` webpage and click the extension icon.
 5. Click **Settings**, select a provider and model, choose a **Target language**, then click **Translate page**.
-6. Use **Remove translations** to clear inserted translations.
+6. Use **Hide translations** to practice reading without translations, **Show translations** to restore them, or **Remove translations** to discard them.
 
-After pulling updates, reload the extension from `chrome://extensions` and refresh the webpage. The extension does not run automatically on every visited page. Opening its popup on a normal webpage installs a small **T** tab for subsequent quick actions.
+After pulling updates, reload the extension from `chrome://extensions` and refresh the webpage. The extension does not run automatically on every visited page. Opening its popup on a normal webpage prepares the floating **T** tab, but it remains hidden until the user presses the tab-toggle shortcut.
 
 ## Reading and translation controls
 
 ### Translate a page
 
-Open the extension popup or the floating **T** tab on a regular webpage and choose **Translate page**. The extension translates eligible visible text blocks progressively, keeping the original text in place. Set the provider, model, and target language under **Settings** in the popup.
+Open the extension popup or reveal the floating **T** tab with **Command+Shift+U** (macOS) / **Ctrl+Shift+U** (other platforms) on a regular webpage and choose **Translate page**. The extension translates eligible visible text blocks progressively, keeping the original text in place. Set the provider, model, and target language under **Settings** in the popup.
 
 ### Hide, show, or remove translations
 
-The popup and floating **T** tab both provide these actions:
+The popup and floating **T** tab both provide these actions. The tab is hidden by default; press **Command+Shift+U** (macOS) or **Ctrl+Shift+U** (other platforms) to show it, and press the same shortcut again to hide it:
 
 | Action | Behavior |
 | --- | --- |
 | **Hide translations** | Temporarily hides inserted translations while leaving the original webpage text visible. |
 | **Show translations** | Reveals the existing translations immediately, without requesting them again. |
 | **Remove translations** | Deletes inserted translation blocks and cancels pending page-translation work. |
+
+Only the action matching the current state is shown: when translations are visible, **Hide translations** is available; when they are hidden, **Show translations** is available. The extension popup and floating **T** panel reflect the same active page state. Changing visibility in either control updates the other while the popup is open, and the popup refreshes its buttons when it regains focus. This synchronization applies to the active tab, not unrelated tabs.
 
 Visibility is a per-page state, not a saved preference across reloads. Newly inserted results from an ongoing page translation follow the current visibility setting. Removing translations is different from hiding them: after removal, use **Translate page** to generate results again.
 
@@ -52,7 +54,7 @@ Visibility is a per-page state, not a saved preference across reloads. Newly ins
 
 The selected-text action uses the provider, model, and target language configured in the extension. It does not translate the entire page or add a persistent bilingual block. Selection requests have a **3,500-character limit**; errors are displayed in the panel.
 
-**Keyboard shortcut:** **Command+Shift+Y** (`⌘⇧Y`) on macOS, or **Ctrl+Shift+Y** on other platforms. These are defaults, not mandatory bindings. Change or disable the shortcut at `chrome://extensions/shortcuts` if it conflicts with another action. **Command+T** is normally reserved for opening a new tab in Chrome and is not the default.
+**Selected-text keyboard shortcut:** **Command+Shift+Y** (`⌘⇧Y`) on macOS, or **Ctrl+Shift+Y** on other platforms. These are defaults, not mandatory bindings. Both shortcuts are configurable at `chrome://extensions/shortcuts`; change or disable either one if it conflicts with another action. **Command+T** is normally reserved for opening a new tab in Chrome and is not the default.
 
 ## Translation providers
 
@@ -159,7 +161,7 @@ Language names, UI, source code, comments, tests, and documentation remain Engli
 - It handles up to **35 eligible blocks** and **120 sentence-sized jobs** per run. Individual source blocks are limited to **3,500 characters**; longer sentences may be split into pieces of up to **600 characters**.
 - It runs up to **two concurrent translation requests** for each provider.
 - Original content stays visible. Translation output is added using `textContent`, not `innerHTML`.
-- Page translations can be hidden and restored without rerunning the model. Selected-text results use a separate dismissible panel.
+- Page translations can be hidden and restored without rerunning the model. The popup and floating panel synchronize the active page's visibility state. Selected-text results use a separate dismissible panel.
 - Clicking **Remove translations** clears inserted results and invalidates pending work so stale results are not reinserted.
 - The compact interface does not show a persistent completion banner on the webpage. Errors appear beside the affected text.
 
@@ -182,6 +184,8 @@ The manifest declares `activeTab`, `scripting`, `storage`, and `contextMenus`, w
 | --- | --- |
 | Settings or translation behaves inconsistently after updating | Reload the extension at `chrome://extensions` and refresh the webpage. |
 | No translation appears | Use a regular webpage with eligible visible text; protected Chrome pages cannot be scripted. Check whether translations are hidden. |
+| Floating **T** tab is missing | It is hidden by default. Press **Command+Shift+U** on macOS or **Ctrl+Shift+U** elsewhere, and check `chrome://extensions/shortcuts` if nothing happens. |
+| Popup and floating controls show different visibility actions | Reload the extension and refresh the webpage. The popup reads the active tab's visibility when opened or refocused; ensure both controls refer to the same tab. |
 | Selected-text shortcut does nothing | Select text on a normal webpage and check the binding or conflicts at `chrome://extensions/shortcuts`. |
 | Selection translation fails | Confirm the configured provider is running or accessible, the selected text is within 3,500 characters, and the webpage allows extension scripts. |
 | No local models are found | Start the selected local service and load a model before clicking **Find local models**. |

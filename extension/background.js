@@ -262,10 +262,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.commands.onCommand.addListener(async (command, tab) => {
-  if (command !== 'translate-selection') return;
+  if (command !== 'translate-selection' && command !== 'toggle-quick-tab') return;
   try {
     const activeTab = tab?.id ? tab : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     if (!activeTab?.id || !/^https?:\/\//.test(activeTab.url || '')) return;
+    if (command === 'toggle-quick-tab') {
+      await chrome.scripting.executeScript({ target: { tabId: activeTab.id }, files: ['content.js'] });
+      await chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_QUICK_TAB' });
+      return;
+    }
     const [{ result: selection }] = await chrome.scripting.executeScript({
       target: { tabId: activeTab.id },
       func: () => window.getSelection()?.toString() || ''

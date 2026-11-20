@@ -30,6 +30,13 @@
         "mac": "Command+Shift+Y"
       },
       "description": "Translate selected text"
+    },
+    "toggle-quick-tab": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+U",
+        "mac": "Command+Shift+U"
+      },
+      "description": "Show or hide the floating translation tab"
     }
   }
 }
