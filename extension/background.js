@@ -184,8 +184,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         model: provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : prefs.ollamaModel,
         target: prefs.target || 'en',
         ollamaBaseUrl: provider === 'ollama' ? prefs.ollamaBaseUrl : undefined,
-        ollamaBaseUrl: provider === 'ollama' ? prefs.ollamaBaseUrl : undefined,
-    deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
+        deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
       };
     })().then(settings => respond({ ok: true, settings }))
       .catch(() => respond({ ok: false, error: 'Unable to load translation preferences.' }));
@@ -231,6 +230,7 @@ async function selectedTextSettings() {
     provider,
     model: provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : (prefs.ollamaModel || 'gemma3:4b'),
     target: prefs.target || 'en',
+    ollamaBaseUrl: provider === 'ollama' ? prefs.ollamaBaseUrl : undefined,
     deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
   };
 }
