@@ -1,10 +1,13 @@
 'use strict';
 
 const DEFAULT_DEEPLOCAL_BASE_URL = 'http://127.0.0.1:14567/v1';
+const DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
 const providerInput = document.getElementById('provider');
 const modelInput = document.getElementById('model');
 const targetInput = document.getElementById('target');
 const deepLocalInput = document.getElementById('deeplocal-url');
+const ollamaInput = document.getElementById('ollama-url');
+const ollamaSettings = document.getElementById('ollama-settings');
 const deepLocalSettings = document.getElementById('deeplocal-settings');
 const openAiSettings = document.getElementById('openai-settings');
 const apiKeyInput = document.getElementById('openai-api-key');
@@ -111,14 +114,30 @@ async function decryptCredential(record, passphrase) {
   }
 }
 
-function validLocalBaseUrl(raw) {
-  const url = new URL(raw.trim());
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' ||
-      !url.port || url.username || url.password || url.search || url.hash ||
-      !['/v1', '/v1/'].includes(url.pathname)) {
-    throw new Error('deepLocal must use http://127.0.0.1:<port>/v1.');
+function validProviderBaseUrl(raw, provider) {
+  if (typeof raw !== 'string' || !raw.trim() || raw.length > 512) throw new Error('Enter a valid API base URL.');
+  let url;
+  try { url = new URL(raw.trim()); }
+  catch { throw new Error('Enter a valid API base URL.'); }
+  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname ||
+      url.username || url.password || url.search || url.hash ||
+      /[\u0000-\u001f\u007f]/.test(raw) || /%2f|%5c/i.test(url.pathname)) {
+    throw new Error('Use an HTTP(S) URL without credentials, query, or fragment.');
   }
-  return `${url.origin}/v1`;
+  const path = url.pathname.replace(/\/+$/, '');
+  if (provider === 'deeplocal' && path !== '/v1') throw new Error('deepLocal API base URL must end with /v1.');
+  if (provider === 'ollama' && path && path !== '/') throw new Error('Ollama API base URL must not include a path.');
+  return url.origin + (provider === 'deeplocal' ? '/v1' : '');
+}
+
+// Host access is requested only after a user explicitly starts translation or model discovery.
+async function grantProviderHostAccess(provider, baseUrl) {
+  if (provider === 'openai') return;
+  const url = new URL(baseUrl);
+  if (url.protocol === 'http:' && url.hostname === '127.0.0.1') return;
+  const origin = url.protocol + '//' + url.hostname + '/*';
+  const granted = await chrome.permissions.request({ origins: [origin] });
+  if (!granted) throw new Error('Host access was not granted for the selected server.');
 }
 
 function settings() {
@@ -129,7 +148,8 @@ function settings() {
   }
   return {
     provider, model, target: targetInput.value,
-    deepLocalBaseUrl: provider === 'deeplocal' ? validLocalBaseUrl(deepLocalInput.value) : undefined,
+    deepLocalBaseUrl: provider === 'deeplocal' ? validProviderBaseUrl(deepLocalInput.value, 'deeplocal') : undefined,
+    ollamaBaseUrl: provider === 'ollama' ? validProviderBaseUrl(ollamaInput.value, 'ollama') : undefined,
     apiKey: provider === 'openai' ? apiKeyInput.value.trim() : undefined
   };
 }
@@ -137,6 +157,7 @@ function settings() {
 function toggleProvider() {
   const provider = providerInput.value;
   deepLocalSettings.hidden = provider !== 'deeplocal';
+  ollamaSettings.hidden = provider !== 'ollama';
   openAiSettings.hidden = provider !== 'openai';
   discoverButton.hidden = provider === 'openai';
   modelInput.value = modelsByProvider[provider] || '';
@@ -153,6 +174,7 @@ async function savePreferences() {
     ollamaModel: modelsByProvider.ollama,
     deepLocalModel: modelsByProvider.deeplocal,
     deepLocalBaseUrl: deepLocalInput.value.trim(),
+    ollamaBaseUrl: ollamaInput.value.trim(),
     openAiModel: modelsByProvider.openai,
     rememberOpenAiKey: rememberKeyInput.checked,
     target: targetInput.value
@@ -162,7 +184,7 @@ async function savePreferences() {
 }
 
 storageReady.then(async () => {
-  const prefs = await chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'openAiApiKey', 'encryptedOpenAiApiKey', 'rememberOpenAiKey', 'deepLocalBaseUrl', 'model', 'target']);
+  const prefs = await chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'openAiApiKey', 'encryptedOpenAiApiKey', 'rememberOpenAiKey', 'deepLocalBaseUrl', 'ollamaBaseUrl', 'model', 'target']);
   if (prefs.openAiApiKey) {
     // Migrate old plaintext storage to session-only without writing it back to disk.
     await chrome.storage.session.set({ openAiApiKey: prefs.openAiApiKey });
@@ -179,6 +201,7 @@ storageReady.then(async () => {
     openai: prefs.openAiModel || 'gpt-4.1-mini'
   };
   deepLocalInput.value = prefs.deepLocalBaseUrl || DEFAULT_DEEPLOCAL_BASE_URL;
+  ollamaInput.value = prefs.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL;
   providerInput.value = ['deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
   rememberKeyInput.checked = Boolean(prefs.encryptedOpenAiApiKey);
   apiKeyInput.value = '';
@@ -187,6 +210,8 @@ storageReady.then(async () => {
   return refreshCredentialStatus();
 }).catch(error => { status.textContent = `Unable to secure key storage: ${error.message}`; });
 
+ollamaInput.addEventListener('change', () => { savePreferences().catch(() => {}); });
+deepLocalInput.addEventListener('change', () => { savePreferences().catch(() => {}); });
 providerInput.addEventListener('change', async () => {
   toggleProvider();
   await savePreferences();
@@ -212,8 +237,10 @@ document.getElementById('discover').addEventListener('click', async () => {
   status.textContent = 'Contacting local model service...';
   try {
     const provider = providerInput.value;
-    const deepLocalBaseUrl = provider === 'deeplocal' ? validLocalBaseUrl(deepLocalInput.value) : undefined;
-    const result = await chrome.runtime.sendMessage({ type: 'LIST_MODELS', provider, deepLocalBaseUrl });
+    const deepLocalBaseUrl = provider === 'deeplocal' ? validProviderBaseUrl(deepLocalInput.value, 'deeplocal') : undefined;
+    const ollamaBaseUrl = provider === 'ollama' ? validProviderBaseUrl(ollamaInput.value, 'ollama') : undefined;
+    await grantProviderHostAccess(provider, deepLocalBaseUrl || ollamaBaseUrl);
+    const result = await chrome.runtime.sendMessage({ type: 'LIST_MODELS', provider, deepLocalBaseUrl, ollamaBaseUrl });
     if (!result?.ok) throw new Error(result?.error || 'Model discovery failed.');
     modelList.replaceChildren();
     for (const id of result.models) {
@@ -237,6 +264,7 @@ async function send(type) {
   status.textContent = '';
   try {
     const options = type === 'START' ? settings() : null;
+    if (options) await grantProviderHostAccess(options.provider, options.deepLocalBaseUrl || options.ollamaBaseUrl);
     if (options) {
       const backend = await chrome.runtime.sendMessage({ type: 'GET_BACKEND_INFO' });
       if (!backend?.ok || !backend.providers?.includes(options.provider) || backend.version !== chrome.runtime.getManifest().version) {
@@ -258,11 +286,15 @@ async function send(type) {
       await savePreferences();
     }
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) throw new Error('Open a normal website before using translation.');
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    if (!tab?.id) throw new Error('No active tab is available. Open a webpage and try again.');
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    } catch (error) {
+      throw new Error('Unable to access this tab. Open a regular website or check extension permissions. ' + error.message);
+    }
     const pageOptions = options ? {
       provider: options.provider, model: options.model, target: options.target,
-      deepLocalBaseUrl: options.deepLocalBaseUrl
+      deepLocalBaseUrl: options.deepLocalBaseUrl, ollamaBaseUrl: options.ollamaBaseUrl
     } : {};
     const result = await chrome.tabs.sendMessage(tab.id, { type, ...pageOptions });
     if (!result?.ok) throw new Error('The webpage did not respond.');
@@ -318,7 +350,7 @@ document.getElementById('close').addEventListener('click', () => window.close())
 
 // Opening the extension action installs the small on-page tab on normal webpages.
 chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
-  if (tab?.id && /^https?:\/\//.test(tab.url || '')) {
+  if (tab?.id) {
     try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] }); }
     catch { /* Restricted pages do not support injected controls. */ }
   }
@@ -338,7 +370,7 @@ async function toggleTranslationVisibility(visible) {
   status.textContent = '';
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) {
+    if (!tab?.id) {
       throw new Error('Open a normal website before changing translation visibility.');
     }
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
@@ -359,7 +391,7 @@ document.getElementById('hide-translations').addEventListener('click', () => tog
 async function refreshTranslationVisibility() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) return;
+    if (!tab?.id) return;
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
     const result = await chrome.tabs.sendMessage(tab.id, { type: 'GET_TRANSLATION_VISIBILITY' });
     if (result?.ok) await updateTranslationVisibility(result.visible);

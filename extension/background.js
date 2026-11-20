@@ -49,22 +49,29 @@ const secureStorageReady = Promise.all([
   chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
 ]);
 
-function validateLocalBaseUrl(raw) {
-  if (typeof raw !== 'string' || raw.length > 180) throw new Error('Invalid deepLocal address.');
+function validateProviderBaseUrl(raw, provider) {
+  if (typeof raw !== 'string' || !raw.trim() || raw.length > 512) {
+    throw new Error('Enter a valid API base URL.');
+  }
   let url;
-  try {
-    url = new URL(raw.trim());
-  } catch {
-    throw new Error('Enter a valid deepLocal local API URL.');
-  }
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' ||
-      !url.port || !/^\d{1,5}$/.test(url.port) ||
-      Number(url.port) < 1 || Number(url.port) > 65535 ||
+  try { url = new URL(raw.trim()); }
+  catch { throw new Error('Enter a valid API base URL.'); }
+  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname ||
       url.username || url.password || url.search || url.hash ||
-      !['/v1', '/v1/'].includes(url.pathname)) {
-    throw new Error('deepLocal must use http://127.0.0.1:<port>/v1.');
+      /[\u0000-\u001f\u007f]/.test(raw) ||
+      /%2f|%5c/i.test(url.pathname)) {
+    throw new Error('Use an HTTP(S) URL without credentials, query, or fragment.');
   }
-  return `${url.origin}/v1`;
+  const path = url.pathname.replace(/\/+$/, '');
+  if (provider === 'deeplocal') {
+    if (path !== '/v1') throw new Error('deepLocal API base URL must end with /v1.');
+    return url.origin + '/v1';
+  }
+  if (provider === 'ollama') {
+    if (path && path !== '/') throw new Error('Ollama API base URL must not include a path.');
+    return url.origin;
+  }
+  throw new Error('Unknown local provider.');
 }
 
 function validateModel(raw) {
@@ -83,10 +90,10 @@ function validateOpenAiApiKey(raw) {
 
 function selectBackend(message) {
   if (message.provider === 'ollama') {
-    return { provider: 'ollama', baseUrl: OLLAMA_BASE_URL };
+    return { provider: 'ollama', baseUrl: validateProviderBaseUrl(message.ollamaBaseUrl || OLLAMA_BASE_URL, 'ollama') };
   }
   if (message.provider === 'deeplocal') {
-    return { provider: 'deeplocal', baseUrl: validateLocalBaseUrl(message.deepLocalBaseUrl) };
+    return { provider: 'deeplocal', baseUrl: validateProviderBaseUrl(message.deepLocalBaseUrl || DEFAULT_DEEPLOCAL_BASE_URL, 'deeplocal') };
   }
   if (message.provider === 'openai') {
     return { provider: 'openai', baseUrl: OPENAI_BASE_URL };
@@ -174,14 +181,15 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     (async () => {
       await secureStorageReady;
       const prefs = await chrome.storage.local.get([
-        'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
+        'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'ollamaBaseUrl', 'target'
       ]);
       const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
       return {
         provider,
         model: provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : prefs.ollamaModel,
         target: prefs.target || 'en',
-        deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
+        deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined,
+        ollamaBaseUrl: provider === 'ollama' ? prefs.ollamaBaseUrl : undefined
       };
     })().then(settings => respond({ ok: true, settings }))
       .catch(() => respond({ ok: false, error: 'Unable to load translation preferences.' }));
@@ -220,14 +228,15 @@ chrome.runtime.onInstalled.addListener(() => {
 async function selectedTextSettings() {
   await secureStorageReady;
   const prefs = await chrome.storage.local.get([
-    'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
+    'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'ollamaBaseUrl', 'target'
   ]);
   const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
   return {
     provider,
     model: provider === 'openai' ? prefs.openAiModel : provider === 'deeplocal' ? prefs.deepLocalModel : (prefs.ollamaModel || 'gemma3:4b'),
     target: prefs.target || 'en',
-    deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined
+    deepLocalBaseUrl: provider === 'deeplocal' ? prefs.deepLocalBaseUrl : undefined,
+    ollamaBaseUrl: provider === 'ollama' ? prefs.ollamaBaseUrl : undefined
   };
 }
 
@@ -264,8 +273,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.commands.onCommand.addListener(async (command, tab) => {
   if (command !== 'translate-selection' && command !== 'toggle-quick-tab') return;
   try {
-    const activeTab = tab?.id ? tab : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
-    if (!activeTab?.id || !/^https?:\/\//.test(activeTab.url || '')) return;
+    const [queriedTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = queriedTab?.id ? queriedTab : tab;
+    if (!activeTab?.id) return;
     if (command === 'toggle-quick-tab') {
       await chrome.scripting.executeScript({ target: { tabId: activeTab.id }, files: ['content.js'] });
       await chrome.tabs.sendMessage(activeTab.id, { type: 'TOGGLE_QUICK_TAB' });
@@ -278,6 +288,6 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
     if (!selection?.trim()) return;
     await translateSelection(activeTab.id, selection);
   } catch (error) {
-    console.warn('[Sovereign Bilingual] Shortcut translation failed:', error.message);
+    console.warn('[Sovereign Bilingual] Keyboard command failed:', error.message);
   }
 });

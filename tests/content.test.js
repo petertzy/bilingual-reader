@@ -229,6 +229,34 @@ test('selects a short linked article heading for translation', () => {
   assert.equal(sourceText(heading), 'Binding Primitives');
 });
 
+test('translates each link separately when one heading groups multiple linked titles', () => {
+  const first = element({ text: 'Writing Service Providers', tag: 'A' });
+  const second = element({ text: 'The Register Method', tag: 'A' });
+  const heading = element({
+    text: 'Writing Service Providers The Register Method',
+    tag: 'H2', children: [first, second]
+  });
+  first.parentElement = heading;
+  second.parentElement = heading;
+  heading.childNodes = [first, second];
+  first.childNodes = [textNode('Writing Service Providers')];
+  second.childNodes = [textNode('The Register Method')];
+  const { candidates, sourceText } = inspectCandidates([heading, first, second]);
+  assert.deepEqual(candidates, [first, second]);
+  assert.equal(sourceText(first), 'Writing Service Providers');
+  assert.equal(sourceText(second), 'The Register Method');
+});
+
+test('keeps a single linked heading as one translation unit', () => {
+  const link = element({ text: 'Introduction', tag: 'A' });
+  const heading = element({ text: 'Introduction', tag: 'H2', children: [link] });
+  link.parentElement = heading;
+  heading.childNodes = [link];
+  link.childNodes = [textNode('Introduction')];
+  const { candidates } = inspectCandidates([heading, link]);
+  assert.deepEqual(candidates, [heading]);
+});
+
 test('selects short semantic paragraphs, lists and accessible headings', () => {
   const heading = element({ text: 'Quick Start', tag: 'DIV' });
   heading.matches = selector => selector.includes('[role="heading"]');
@@ -346,6 +374,37 @@ test('floating tab is hidden initially and the same command shows and hides it',
   assert.equal(host.style.display, '');
   assert.equal(toggle().visible, false);
   assert.equal(host.style.display, 'none');
+});
+
+test('floating tab shortcut toggles the tab and ignores repeated keydown events', () => {
+  let keydown;
+  const host = { style: { display: 'none' } };
+  const document = {
+    getElementById() { return {}; },
+    addEventListener(type, listener) { if (type === 'keydown') keydown = listener; }
+  };
+  const instrumented = script.replace(
+    '  // A small, user-controlled tab provides translation without a persistent settings window.',
+    '  globalThis.__setQuickTabHost = host => { quickTabHost = host; };\n  // A small, user-controlled tab provides translation without a persistent settings window.'
+  );
+  const context = {
+    document, window: { innerHeight: 800 },
+    chrome: { runtime: { onMessage: { addListener() {} } } },
+    Intl, console
+  };
+  vm.runInNewContext(instrumented, context);
+  context.__setQuickTabHost(host);
+  let prevented = 0;
+  const event = {
+    code: 'KeyU', metaKey: true, ctrlKey: false, shiftKey: true,
+    altKey: false, repeat: false, target: {},
+    preventDefault() { prevented++; }
+  };
+  keydown(event);
+  assert.equal(host.style.display, '');
+  keydown({ ...event, repeat: true });
+  assert.equal(host.style.display, '');
+  assert.equal(prevented, 1);
 });
 
 test('notifies extension popup when webpage translation visibility changes', () => {

@@ -6,8 +6,8 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 
 ## Features
 
-- Translate eligible text on ordinary webpages without replacing the original content.
-- Choose between local Ollama, local deepLocal, and explicitly selected OpenAI.
+- Translate eligible text on ordinary webpages without replacing the original content. When one heading groups multiple links, translate each linked title separately instead of combining them into one model request.
+- Choose between Ollama, deepLocal, and explicitly selected OpenAI. Configure either local provider's API URL to use the same computer or a trusted server on another computer.
 - Select from **36 target-language options**, including Chinese (Simplified) and Chinese (Traditional), with English-only UI labels.
 - Use a compact extension popup; open **Settings** to choose a provider, model, and target language.
 - Keep the floating **T** tab hidden until needed; toggle it with **Command+Shift+U** on macOS (**Ctrl+Shift+U** elsewhere). Its controls offer **Translate page**, **Show translations**, **Hide translations**, and **Remove translations**. The popup and floating controls stay synchronized when translation visibility changes.
@@ -56,16 +56,17 @@ The selected-text action uses the provider, model, and target language configure
 
 **Selected-text keyboard shortcut:** **Command+Shift+Y** (`⌘⇧Y`) on macOS, or **Ctrl+Shift+Y** on other platforms. These are defaults, not mandatory bindings. Both shortcuts are configurable at `chrome://extensions/shortcuts`; change or disable either one if it conflicts with another action. **Command+T** is normally reserved for opening a new tab in Chrome and is not the default.
 
+
 ## Translation providers
 
 ### Ollama (local)
 
 1. Install and start [Ollama](https://ollama.com/).
 2. Download a model you trust, for example `ollama pull gemma3:4b`.
-3. Confirm Ollama is listening on `http://127.0.0.1:11434`.
-4. In **Settings**, select **Ollama**, click **Find local models**, and select a loaded model ID.
+3. Confirm Ollama is listening on `http://127.0.0.1:11434`, or obtain the HTTP(S) address of an Ollama server you trust.
+4. In **Settings**, select **Ollama**, set **Ollama API base URL** (default: `http://127.0.0.1:11434`), click **Find local models**, and select a loaded model ID.
 
-Model discovery uses `GET /api/tags`; translation uses `POST /api/chat`. Model quality and language coverage vary.
+Model discovery uses `GET /api/tags`; translation uses `POST /api/chat`. The Ollama base URL must contain only the scheme, host, and optional port (no `/api` suffix). Model quality and language coverage vary.
 
 ### deepLocal (local)
 
@@ -73,10 +74,10 @@ Project: https://github.com/petertzy/deepLocal
 
 1. Start deepLocal and load a GGUF model.
 2. Copy the **API base URL** from deepLocal's **Server** page.
-3. In **Settings**, select **deepLocal** and paste the URL into **deepLocal API base URL**.
+3. In **Settings**, select **deepLocal** and paste the URL into **deepLocal API base URL**. It defaults to `http://127.0.0.1:14567/v1` and must end with `/v1`.
 4. Click **Find local models** and select the exact returned model ID.
 
-The development default is `http://127.0.0.1:14567/v1`. Packaged desktop builds may choose a different loopback port each time they start. The extension accepts only `http://127.0.0.1:<port>/v1`; it does not scan for ports automatically. Model discovery uses `GET /v1/models`; translation uses `POST /v1/chat/completions` with `use_documents: false` and `stream: false`.
+The development default is `http://127.0.0.1:14567/v1`. Packaged desktop builds may choose a different loopback port each time they start. The extension does not scan for ports automatically. You may configure a trusted remote HTTP(S) host, but the deepLocal server must actually be reachable from the browser; a loopback-only listener cannot be accessed from another computer without an appropriate, securely configured proxy or tunnel. Model discovery uses `GET /v1/models`; translation uses `POST /v1/chat/completions` with `use_documents: false` and `stream: false`.
 
 To check a development server:
 
@@ -85,6 +86,21 @@ curl http://127.0.0.1:14567/v1/models
 ```
 
 Replace the port with the one shown by deepLocal. Avoid exposing local model services to the public network.
+
+## Custom provider endpoints and host access
+
+Both local-model providers have an editable **API base URL** in **Settings**:
+
+| Provider | Default | Example on another computer |
+| --- | --- | --- |
+| Ollama | `http://127.0.0.1:11434` | `http://192.168.1.50:11434` |
+| deepLocal | `http://127.0.0.1:14567/v1` | `http://192.168.1.50:14567/v1` |
+
+Enter the base URL, then click **Find local models** or **Translate page**. When the destination is not the default local loopback host, Chrome asks for access to that server's origin. Grant access only for servers you control or trust. The extension saves each provider's URL independently and reuses it for page translation, model discovery, and selected-text translation. The floating **T** tab uses saved preferences; authorize a remote host through the popup first.
+
+Custom endpoints accept HTTP or HTTPS, a host, and an optional port. Credentials, query strings, fragments, and unexpected paths are rejected. Ollama URLs must not include an API path; deepLocal URLs must end in `/v1`. Existing local defaults continue to work without additional permission prompts.
+
+**Security:** Remote HTTP sends source text unencrypted over the network. Prefer HTTPS or a trusted encrypted tunnel for traffic beyond your own machine, and never expose an unauthenticated model API directly to the public internet. A remote service must listen on an accessible interface, allow connections through its firewall, and be compatible with the provider's API. The extension does not configure servers or network firewalls.
 
 ### OpenAI (optional cloud)
 
@@ -167,10 +183,10 @@ Language names, UI, source code, comments, tests, and documentation remain Engli
 
 ## Permissions and privacy
 
-The manifest declares `activeTab`, `scripting`, `storage`, and `contextMenus`, with host permissions for `http://127.0.0.1/*` and `https://api.openai.com/*`. It does **not** request `<all_urls>`. Chrome host match patterns cannot restrict permissions to specific ports, so deepLocal addresses are additionally validated in code. Configured deepLocal URLs must use numeric `127.0.0.1`, an explicit port, and the `/v1` path. Requests reject HTTP redirects.
+The manifest declares `activeTab`, `scripting`, `storage`, `contextMenus`, and `permissions`, with required host permissions for `http://127.0.0.1/*` and `https://api.openai.com/*`. It also declares optional HTTP(S) host permissions, requested only when the user explicitly initiates model discovery or page translation for a configured non-default host. Chrome host match patterns cannot restrict permissions to individual ports; provider base URLs are validated before requests. Requests reject HTTP redirects.
 
 - No telemetry, external script CDN, user account, or extension-managed auto-update service is implemented.
-- Local providers receive source text through services running on the same machine.
+- Ollama and deepLocal receive source text at the configured API endpoint, which may be another computer. Remote HTTP connections are not encrypted.
 - OpenAI receives source text only when selected; cloud translation is not a silent fallback.
 - Webpage text, including selected text, is not intentionally persisted by the extension. The selected text is sent to the configured translation provider when translation is requested.
 - The deepLocal request explicitly disables optional document retrieval with `use_documents: false`.
@@ -189,7 +205,8 @@ The manifest declares `activeTab`, `scripting`, `storage`, and `contextMenus`, w
 | Selected-text shortcut does nothing | Select text on a normal webpage and check the binding or conflicts at `chrome://extensions/shortcuts`. |
 | Selection translation fails | Confirm the configured provider is running or accessible, the selected text is within 3,500 characters, and the webpage allows extension scripts. |
 | No local models are found | Start the selected local service and load a model before clicking **Find local models**. |
-| deepLocal cannot connect | Copy the current loopback API URL from its **Server** page; the port may have changed. |
+| deepLocal cannot connect | Copy the current API URL from its **Server** page; the port may have changed. Remote hosts require a reachable listener or proxy and host permission. |
+| Remote Ollama or deepLocal connection fails | Confirm the exact API base URL, Chrome host access approval, server bind address, firewall, and API compatibility. Configure HTTPS or a trusted tunnel for sensitive text. |
 | OpenAI asks for a key after restarting | An encrypted key must be unlocked with the vault passphrase for the new session. |
 | The OpenAI API key field is empty after saving | This is intentional; check the credential status text. |
 | OpenAI translation fails with an HTTP error | Check API key validity, model access, quota, billing, and network access. Do not share secrets when reporting errors. |
