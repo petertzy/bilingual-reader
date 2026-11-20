@@ -1,10 +1,15 @@
 'use strict';
 
 const DEFAULT_DEEPLOCAL_BASE_URL = 'http://127.0.0.1:14567/v1';
+const DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
 const providerInput = document.getElementById('provider');
 const modelInput = document.getElementById('model');
 const targetInput = document.getElementById('target');
 const deepLocalInput = document.getElementById('deeplocal-url');
+const ollamaInput = document.getElementById('ollama-url');
+const ollamaSettings = document.getElementById('ollama-settings');
+const allowHostButton = document.getElementById('allow-provider-host');
+const hostHint = document.getElementById('provider-host-hint');
 const deepLocalSettings = document.getElementById('deeplocal-settings');
 const openAiSettings = document.getElementById('openai-settings');
 const apiKeyInput = document.getElementById('openai-api-key');
@@ -111,14 +116,60 @@ async function decryptCredential(record, passphrase) {
   }
 }
 
-function validLocalBaseUrl(raw) {
-  const url = new URL(raw.trim());
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' ||
-      !url.port || url.username || url.password || url.search || url.hash ||
-      !['/v1', '/v1/'].includes(url.pathname)) {
-    throw new Error('deepLocal must use http://127.0.0.1:<port>/v1.');
+function validProviderBaseUrl(raw, provider) {
+  const label = provider === 'ollama' ? 'Ollama' : 'deepLocal';
+  if (typeof raw !== 'string' || !raw.trim() || raw.length > 300 ||
+      /[\u0000-\u0020\u007f]/.test(raw.trim())) {
+    throw new Error(`Enter a valid ${label} API base URL.`);
   }
-  return `${url.origin}/v1`;
+  let url;
+  try { url = new URL(raw.trim()); }
+  catch { throw new Error(`Enter a valid ${label} API base URL.`); }
+  const allowedPaths = provider === 'ollama' ? ['', '/'] : ['/v1', '/v1/'];
+  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname ||
+      url.username || url.password || url.search || url.hash ||
+      !allowedPaths.includes(url.pathname)) {
+    throw new Error(provider === 'ollama'
+      ? 'Ollama URL must be an HTTP(S) origin without a path.'
+      : 'deepLocal URL must be an HTTP(S) origin ending in /v1.');
+  }
+  return provider === 'ollama' ? url.origin : `${url.origin}/v1`;
+}
+
+function selectedProviderUrl() {
+  const provider = providerInput.value;
+  if (provider === 'openai') return null;
+  return validProviderBaseUrl(
+    provider === 'ollama' ? ollamaInput.value : deepLocalInput.value, provider);
+}
+
+function providerHostPattern(baseUrl) {
+  const url = new URL(baseUrl);
+  return `${url.protocol}//${url.hostname}/*`;
+}
+
+async function hasProviderPermission() {
+  const baseUrl = selectedProviderUrl();
+  if (!baseUrl) return true;
+  const pattern = providerHostPattern(baseUrl);
+  return chrome.permissions.contains({ origins: [pattern] });
+}
+
+async function refreshProviderPermission() {
+  try {
+    const needsPermission = !(await hasProviderPermission());
+    allowHostButton.hidden = !needsPermission;
+    hostHint.hidden = !needsPermission;
+  } catch {
+    allowHostButton.hidden = true;
+    hostHint.hidden = true;
+  }
+}
+
+async function requireProviderPermission() {
+  if (!(await hasProviderPermission())) {
+    throw new Error('Grant access to the provider server with Allow provider server access first.');
+  }
 }
 
 function settings() {
@@ -129,7 +180,8 @@ function settings() {
   }
   return {
     provider, model, target: targetInput.value,
-    deepLocalBaseUrl: provider === 'deeplocal' ? validLocalBaseUrl(deepLocalInput.value) : undefined,
+    ollamaBaseUrl: provider === 'ollama' ? selectedProviderUrl() : undefined,
+    deepLocalBaseUrl: provider === 'deeplocal' ? selectedProviderUrl() : undefined,
     apiKey: provider === 'openai' ? apiKeyInput.value.trim() : undefined
   };
 }
@@ -137,12 +189,14 @@ function settings() {
 function toggleProvider() {
   const provider = providerInput.value;
   deepLocalSettings.hidden = provider !== 'deeplocal';
+  ollamaSettings.hidden = provider !== 'ollama';
   openAiSettings.hidden = provider !== 'openai';
   discoverButton.hidden = provider === 'openai';
   modelInput.value = modelsByProvider[provider] || '';
   modelInput.placeholder = provider === 'deeplocal' ? 'Find or paste a loaded model ID' : provider === 'openai' ? 'gpt-4.1-mini' : 'gemma3:4b';
   modelList.replaceChildren();
   status.textContent = '';
+  refreshProviderPermission();
 }
 
 async function savePreferences() {
@@ -153,6 +207,7 @@ async function savePreferences() {
     ollamaModel: modelsByProvider.ollama,
     deepLocalModel: modelsByProvider.deeplocal,
     deepLocalBaseUrl: deepLocalInput.value.trim(),
+    ollamaBaseUrl: ollamaInput.value.trim(),
     openAiModel: modelsByProvider.openai,
     rememberOpenAiKey: rememberKeyInput.checked,
     target: targetInput.value
@@ -162,7 +217,7 @@ async function savePreferences() {
 }
 
 storageReady.then(async () => {
-  const prefs = await chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'openAiApiKey', 'encryptedOpenAiApiKey', 'rememberOpenAiKey', 'deepLocalBaseUrl', 'model', 'target']);
+  const prefs = await chrome.storage.local.get(['provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'openAiApiKey', 'encryptedOpenAiApiKey', 'rememberOpenAiKey', 'deepLocalBaseUrl', 'ollamaBaseUrl', 'model', 'target']);
   if (prefs.openAiApiKey) {
     // Migrate old plaintext storage to session-only without writing it back to disk.
     await chrome.storage.session.set({ openAiApiKey: prefs.openAiApiKey });
@@ -179,6 +234,7 @@ storageReady.then(async () => {
     openai: prefs.openAiModel || 'gpt-4.1-mini'
   };
   deepLocalInput.value = prefs.deepLocalBaseUrl || DEFAULT_DEEPLOCAL_BASE_URL;
+  ollamaInput.value = prefs.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL;
   providerInput.value = ['deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
   rememberKeyInput.checked = Boolean(prefs.encryptedOpenAiApiKey);
   apiKeyInput.value = '';
@@ -192,6 +248,28 @@ providerInput.addEventListener('change', async () => {
   await savePreferences();
 });
 modelInput.addEventListener('change', () => { savePreferences().catch(() => {}); });
+for (const input of [ollamaInput, deepLocalInput]) {
+  input.addEventListener('input', () => { refreshProviderPermission(); });
+  input.addEventListener('change', () => {
+    savePreferences().catch(error => { status.textContent = error.message; });
+    refreshProviderPermission();
+  });
+}
+
+allowHostButton.addEventListener('click', async () => {
+  try {
+    const baseUrl = selectedProviderUrl();
+    if (!baseUrl) return;
+    const granted = await chrome.permissions.request({ origins: [providerHostPattern(baseUrl)] });
+    if (!granted) throw new Error('Server access was not granted.');
+    await savePreferences();
+    status.textContent = 'Provider server access granted.';
+    await refreshProviderPermission();
+  } catch (error) {
+    status.textContent = `Unable to grant server access: ${error.message}`;
+  }
+});
+
 rememberKeyInput.addEventListener('change', async () => {
   if (rememberKeyInput.checked) {
     savePreferences().catch(error => { status.textContent = `Unable to update key storage: ${error.message}`; });
@@ -212,8 +290,10 @@ document.getElementById('discover').addEventListener('click', async () => {
   status.textContent = 'Contacting local model service...';
   try {
     const provider = providerInput.value;
-    const deepLocalBaseUrl = provider === 'deeplocal' ? validLocalBaseUrl(deepLocalInput.value) : undefined;
-    const result = await chrome.runtime.sendMessage({ type: 'LIST_MODELS', provider, deepLocalBaseUrl });
+    await requireProviderPermission();
+    const ollamaBaseUrl = provider === 'ollama' ? selectedProviderUrl() : undefined;
+    const deepLocalBaseUrl = provider === 'deeplocal' ? selectedProviderUrl() : undefined;
+    const result = await chrome.runtime.sendMessage({ type: 'LIST_MODELS', provider, ollamaBaseUrl, deepLocalBaseUrl });
     if (!result?.ok) throw new Error(result?.error || 'Model discovery failed.');
     modelList.replaceChildren();
     for (const id of result.models) {
@@ -237,6 +317,7 @@ async function send(type) {
   status.textContent = '';
   try {
     const options = type === 'START' ? settings() : null;
+    if (options && options.provider !== 'openai') await requireProviderPermission();
     if (options) {
       const backend = await chrome.runtime.sendMessage({ type: 'GET_BACKEND_INFO' });
       if (!backend?.ok || !backend.providers?.includes(options.provider) || backend.version !== chrome.runtime.getManifest().version) {
@@ -262,7 +343,7 @@ async function send(type) {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
     const pageOptions = options ? {
       provider: options.provider, model: options.model, target: options.target,
-      deepLocalBaseUrl: options.deepLocalBaseUrl
+      ollamaBaseUrl: options.ollamaBaseUrl, deepLocalBaseUrl: options.deepLocalBaseUrl
     } : {};
     const result = await chrome.tabs.sendMessage(tab.id, { type, ...pageOptions });
     if (!result?.ok) throw new Error('The webpage did not respond.');
