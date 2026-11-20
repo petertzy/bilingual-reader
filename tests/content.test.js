@@ -254,3 +254,37 @@ test('does not select short generic containers or interactive controls', () => {
   const hidden = element({ text: 'Hidden', tag: 'P', visible: false });
   assert.deepEqual(selectCandidates([shortDiv, shortSpan, button, hidden]), []);
 });
+
+test('hides and restores existing translations without clearing their text', () => {
+  const first = { hidden: false, style: { display: '' }, textContent: 'First translation' };
+  const second = { hidden: false, style: { display: '' }, textContent: 'Second translation' };
+  const messages = new Map();
+  const document = {
+    getElementById() { return {}; },
+    querySelectorAll(selector) {
+      return selector.includes('="translation"') ? [first, second] : [];
+    }
+  };
+  const context = {
+    document,
+    window: { innerHeight: 800 },
+    chrome: { runtime: { onMessage: { addListener(fn) { messages.set('listener', fn); } } } },
+    Intl,
+    console
+  };
+  vm.runInNewContext(script, context);
+  function send(type) {
+    let response;
+    messages.get('listener')({ type }, null, value => { response = value; });
+    return response;
+  }
+  assert.equal(send('HIDE_TRANSLATIONS').visible, false);
+  assert.equal(first.hidden, true);
+  assert.equal(second.style.display, 'none');
+  assert.equal(send('GET_TRANSLATION_VISIBILITY').visible, false);
+  assert.equal(send('SHOW_TRANSLATIONS').visible, true);
+  assert.equal(first.hidden, false);
+  assert.equal(second.style.display, '');
+  assert.equal(first.textContent, 'First translation');
+  assert.equal(second.textContent, 'Second translation');
+});
