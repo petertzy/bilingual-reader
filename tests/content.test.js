@@ -166,3 +166,55 @@ test('preserves normal paragraph translation placement', () => {
   context.__insertTranslation(original, wrapper);
   assert.deepEqual(placement, { position: 'afterend', node: wrapper });
 });
+
+function textNode(value) {
+  return { nodeType: 3, textContent: value };
+}
+
+function domNode(tagName, children, excluded = false) {
+  return {
+    nodeType: 1,
+    tagName,
+    childNodes: children,
+    matches(selector) {
+      if (excluded) return selector.includes('button');
+      return selector.includes('p, li') && tagName === 'P';
+    }
+  };
+}
+
+test('keeps inline anchor text in a long paragraph instead of dropping tagged', () => {
+  const paragraph = domNode('P', [
+    textNode('Sometimes a class may depend on an array of '),
+    domNode('A', [textNode('tagged')]),
+    textNode(' instances. Using the giveTagged method, you may easily inject all of the container bindings with that tag:')
+  ]);
+  paragraph.innerText = 'Sometimes a class may depend on an array of tagged instances. Using the giveTagged method, you may easily inject all of the container bindings with that tag:';
+  const { sourceText } = inspectCandidates([]);
+  assert.equal(sourceText(paragraph), paragraph.innerText);
+});
+
+test('preserves adjacent inline formatting and excludes controls', () => {
+  const paragraph = domNode('P', [
+    textNode('Read the '),
+    domNode('STRONG', [textNode('important')]),
+    textNode(' '),
+    domNode('CODE', [textNode('tagged')]),
+    textNode(' examples before continuing.'),
+    domNode('BUTTON', [textNode('Copy this text')], true)
+  ]);
+  const { sourceText } = inspectCandidates([]);
+  assert.equal(sourceText(paragraph), 'Read the important tagged examples before continuing.');
+});
+
+test('normalizes whitespace across inline text and line breaks', () => {
+  const paragraph = domNode('P', [
+    textNode('An array of '),
+    domNode('EM', [textNode('tagged')]),
+    textNode('  instances'),
+    domNode('BR', []),
+    textNode('can be injected.')
+  ]);
+  const { sourceText } = inspectCandidates([]);
+  assert.equal(sourceText(paragraph), 'An array of tagged instances can be injected.');
+});
