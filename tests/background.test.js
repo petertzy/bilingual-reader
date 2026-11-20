@@ -94,18 +94,49 @@ test('model discovery reads Ollama model names', async () => {
   assert.equal(worker.calls[0].url, 'http://127.0.0.1:11434/api/tags');
 });
 
-test('deepLocal URL validation rejects remote hosts, local aliases, and other paths', async () => {
-  for (const url of [
-    'https://127.0.0.1:14567/v1',
-    'http://localhost:14567/v1',
-    'http://192.168.0.4:14567/v1',
-    'http://127.0.0.1:14567/runtime',
-    'http://127.0.0.1:14567/v1?redirect=1',
-    'http://127.0.0.1:14567@remote.example/v1'
-  ]) {
+test('deepLocal accepts a remote API base URL and preserves its /v1 prefix', async () => {
+  const worker = createWorker(() => ({ choices: [{ message: { content: 'Translated' } }] }));
+  const result = await worker.message({
+    type: 'TRANSLATE', provider: 'deeplocal', deepLocalBaseUrl: 'http://192.168.1.50:14567/v1',
+    model: 'remote-model', target: 'en', text: 'Hello'
+  });
+  assert.equal(result.ok, true);
+  assert.equal(worker.calls[0].url, 'http://192.168.1.50:14567/v1/chat/completions');
+});
+
+test('Ollama accepts a remote base URL for model discovery and translation', async () => {
+  const worker = createWorker(url => url.endsWith('/api/tags')
+    ? { models: [{ name: 'remote-model' }] }
+    : { message: { content: 'Translated' } });
+  const models = await worker.message({
+    type: 'LIST_MODELS', provider: 'ollama', ollamaBaseUrl: 'http://192.168.1.51:11434'
+  }, false);
+  assert.equal(models.ok, true);
+  assert.equal(worker.calls[0].url, 'http://192.168.1.51:11434/api/tags');
+  const translation = await worker.message({
+    type: 'TRANSLATE', provider: 'ollama', ollamaBaseUrl: 'http://192.168.1.51:11434',
+    model: 'remote-model', target: 'en', text: 'Hello'
+  });
+  assert.equal(translation.ok, true);
+  assert.equal(worker.calls[1].url, 'http://192.168.1.51:11434/api/chat');
+});
+
+test('provider URLs reject credentials, unsupported paths, queries, and protocols', async () => {
+  const cases = [
+    ['deeplocal', 'http://192.168.1.50:14567/runtime'],
+    ['deeplocal', 'http://192.168.1.50:14567/v1?token=secret'],
+    ['deeplocal', 'http://user:pass@192.168.1.50:14567/v1'],
+    ['deeplocal', 'ftp://192.168.1.50:14567/v1'],
+    ['ollama', 'http://192.168.1.51:11434/api/chat'],
+    ['ollama', 'http://192.168.1.51:11434/?key=secret'],
+    ['ollama', 'http://192.168.1.51:11434@remote.example/']
+  ];
+  for (const [provider, url] of cases) {
     const worker = createWorker(() => ({}));
     const result = await worker.message({
-      type: 'TRANSLATE', provider: 'deeplocal', deepLocalBaseUrl: url,
+      type: 'TRANSLATE', provider,
+      deepLocalBaseUrl: provider === 'deeplocal' ? url : undefined,
+      ollamaBaseUrl: provider === 'ollama' ? url : undefined,
       model: 'local-model', target: 'en', text: 'Hello'
     });
     assert.equal(result.ok, false, url);
