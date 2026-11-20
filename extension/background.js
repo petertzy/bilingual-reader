@@ -171,7 +171,7 @@ async function translate(message) {
       body: JSON.stringify(payload)
     });
   } catch (error) {
-    if (provider === 'ollama' && /^HTTP 403(?:\\b|:)/.test(String(error.message || error))) {
+    if (provider === 'ollama' && String(error.message || error).startsWith('HTTP 403')) {
       throw new Error(
         'Ollama rejected the extension request (HTTP 403). The browser extension origin may not be allowed. ' +
         'Add chrome-extension://' + chrome.runtime.id + ' to OLLAMA_ORIGINS, restart Ollama, and retry. ' +
