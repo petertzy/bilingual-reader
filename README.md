@@ -68,6 +68,8 @@ The selected-text action uses the provider, model, and target language configure
 
 Model discovery uses `GET /api/tags`; translation uses `POST /api/chat`. The Ollama base URL must contain only the scheme, host, and optional port (no `/api` suffix). Model quality and language coverage vary.
 
+**HTTP 403 from the browser extension:** If Ollama works from PowerShell but translation reports HTTP 403, Ollama may be rejecting the Chrome extension origin. The extension now includes its exact `chrome-extension://<extension-id>` origin in the error message. On Windows, quit Ollama completely, set `OLLAMA_ORIGINS` to include that exact origin (preserving any other required origins), then restart Ollama. For example, run `[Environment]::SetEnvironmentVariable('OLLAMA_ORIGINS', 'chrome-extension://<extension-id>', 'User')` in PowerShell after replacing the placeholder with the extension ID. Restart the Ollama desktop application so it inherits the new environment variable. A successful PowerShell `/api/chat` request does not establish that browser-extension origin access is allowed. Do not disable browser security or expose Ollama on a public interface to work around this error.
+
 ### deepLocal (local)
 
 Project: https://github.com/petertzy/deepLocal

@@ -163,11 +163,23 @@ async function translate(message) {
     // Persistent credentials are encrypted and must be unlocked in the popup.
     headers.Authorization = `Bearer ${validateOpenAiApiKey(session.openAiApiKey)}`;
   }
-  const result = await fetchJson(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload)
-  });
+  let result;
+  try {
+    result = await fetchJson(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    if (provider === 'ollama' && String(error.message || error).startsWith('HTTP 403')) {
+      throw new Error(
+        'Ollama rejected the extension request (HTTP 403). The browser extension origin may not be allowed. ' +
+        'Add chrome-extension://' + chrome.runtime.id + ' to OLLAMA_ORIGINS, restart Ollama, and retry. ' +
+        'Original error: ' + String(error.message || error)
+      );
+    }
+    throw error;
+  }
   const output = provider === 'ollama' ? result?.message?.content : result?.choices?.[0]?.message?.content;
   if (typeof output !== 'string' || !output.trim()) throw new Error('The model returned no translation.');
   return output.trim();
