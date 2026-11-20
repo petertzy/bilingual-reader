@@ -287,6 +287,6 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
     if (!selection?.trim()) return;
     await translateSelection(activeTab.id, selection);
   } catch (error) {
-    console.warn('[Sovereign Bilingual] Shortcut translation failed:', error.message);
+    console.warn('[Sovereign Bilingual] Keyboard command failed:', error.message);
   }
 });
