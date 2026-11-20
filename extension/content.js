@@ -313,10 +313,55 @@
     document.documentElement.append(host);
   }
 
+
+  // Selection translations are separate from page-wide bilingual blocks.
+  let selectionPanel = null;
+  let activeSelectionRequest = null;
+  function showSelectionTranslation(message) {
+    if (message.pending) {
+      activeSelectionRequest = message.requestId;
+    } else if (message.requestId !== activeSelectionRequest) {
+      return;
+    }
+    if (!selectionPanel) {
+      const panel = document.createElement('div');
+      panel.id = 'sovereign-reader-selection-translation';
+      panel.style.cssText = 'position:fixed;z-index:2147483647;width:min(340px,calc(100vw - 24px));max-height:45vh;overflow:auto;padding:14px 16px;background:#fff;color:#18212f;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 8px 30px #0003;font:14px/1.5 system-ui,sans-serif;white-space:pre-wrap;';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.textContent = 'Close';
+      close.style.cssText = 'float:right;margin-left:12px;padding:3px 7px;border:0;border-radius:5px;background:#edf1f7;color:#18212f;cursor:pointer;';
+      close.addEventListener('click', () => {
+        panel.remove();
+        selectionPanel = null;
+        activeSelectionRequest = null;
+      });
+      const heading = document.createElement('strong');
+      heading.textContent = 'Selected text translation';
+      const content = document.createElement('div');
+      content.style.cssText = 'margin-top:10px;overflow-wrap:anywhere;';
+      panel.append(close, heading, content);
+      document.documentElement.append(panel);
+      selectionPanel = { panel, content };
+    }
+    const { panel, content } = selectionPanel;
+    const range = window.getSelection()?.rangeCount ? window.getSelection().getRangeAt(0) : null;
+    const rect = range?.getBoundingClientRect();
+    const top = rect && rect.bottom > 0 && rect.bottom < window.innerHeight
+      ? rect.bottom + 10 : Math.round(window.innerHeight * 0.2);
+    panel.style.top = Math.max(8, Math.min(top, window.innerHeight - 130)) + 'px';
+    panel.style.left = Math.max(8, Math.min(rect?.left ?? window.innerWidth - 360, window.innerWidth - 360)) + 'px';
+    content.textContent = message.pending ? 'Translating…' :
+      message.error ? 'Translation failed: ' + message.error : message.translation || '';
+  }
+
   installQuickTab();
 
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
-    if (message?.type === 'START') {
+    if (message?.type === 'SELECTION_TRANSLATION') {
+      showSelectionTranslation(message);
+      respond({ ok: true });
+    } else if (message?.type === 'START') {
       translate({
         provider: message.provider, model: message.model,
         target: message.target, deepLocalBaseUrl: message.deepLocalBaseUrl
