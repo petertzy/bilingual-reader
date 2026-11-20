@@ -16,7 +16,9 @@ function createWorker(responder) {
   const context = {
     URL, AbortController, setTimeout, clearTimeout,
     chrome: {
-      runtime: { onMessage: { addListener(fn) { handler = fn; } } },
+      runtime: { onMessage: { addListener(fn) { handler = fn; } }, onInstalled: { addListener() {} } },
+      contextMenus: { onClicked: { addListener() {} } },
+      commands: { onCommand: { addListener() {} } },
       storage: {
         session: {
           async setAccessLevel(options) { accessLevels.push(['session', options.accessLevel]); },
