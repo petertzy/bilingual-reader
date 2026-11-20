@@ -17,4 +17,6 @@ test('floating tab toggle accepts normal HTTP and HTTPS pages', () => {
   assert.match(popup, /type: 'TOGGLE_QUICK_TAB'/);
   assert.match(popup, /chrome\.commands\.getAll\(\)/);
   assert.match(popup, /Open a normal webpage before toggling the floating tab/);
+  assert.match(popup, /tab\.url\?\.startsWith\('https:\/\/'\)/);
+  assert.match(popup, /tab\.url\?\.startsWith\('http:\/\/'\)/);
 });
