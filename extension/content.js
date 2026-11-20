@@ -391,7 +391,7 @@
   installQuickTab();
 
   // Fallback for browsers that do not dispatch the extension command shortcut.
-  document.addEventListener('keydown', event => {
+  document.addEventListener?.('keydown', event => {
     if (event.repeat || !event.shiftKey || !event.code || event.code !== 'KeyU') return;
     if (event.altKey || !(event.metaKey || event.ctrlKey)) return;
     if (event.target?.closest?.('input,textarea,select,[contenteditable]')) return;
