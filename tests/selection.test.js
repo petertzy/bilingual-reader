@@ -79,3 +79,12 @@ test('ignores unrelated context menu items', () => {
     { id: 7, url: 'https://example.com' });
   assert.equal(sent.length, 0);
 });
+
+test('floating tab shortcut toggles controls without translating selected text', async () => {
+  const { handlers, sent } = harness();
+  await handlers.command('toggle-quick-tab', { id: 7, url: 'https://example.com' });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].type, 'TOGGLE_QUICK_TAB');
+  assert.equal(manifest.commands['toggle-quick-tab'].suggested_key.mac, 'Command+Shift+U');
+  assert.equal(manifest.commands['translate-selection'].suggested_key.mac, 'Command+Shift+Y');
+});
