@@ -6,7 +6,7 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 
 ## Features
 
-- Translate eligible text on ordinary webpages without replacing the original content.
+- Translate eligible text on ordinary webpages without replacing the original content. When one heading groups multiple links, translate each linked title separately instead of combining them into one model request.
 - Choose between Ollama, deepLocal, and explicitly selected OpenAI. Configure either local provider's API URL to use the same computer or a trusted server on another computer.
 - Select from **36 target-language options**, including Chinese (Simplified) and Chinese (Traditional), with English-only UI labels.
 - Use a compact extension popup; open **Settings** to choose a provider, model, and target language.
