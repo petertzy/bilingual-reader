@@ -26,10 +26,15 @@
   <p class="note">Local-first translation. OpenAI sends page text to the cloud only when selected.</p>
   <label for="provider">Translation provider</label>
   <select id="provider"><option value="ollama">Ollama</option><option value="deeplocal">deepLocal</option><option value="openai">OpenAI (cloud, opt-in)</option></select>
+  <div id="ollama-settings" hidden>
+    <label for="ollama-url">Ollama API base URL</label>
+    <input id="ollama-url" value="http://127.0.0.1:11434" placeholder="http://127.0.0.1:11434" spellcheck="false" autocomplete="off">
+    <p class="note">Use the default local address or an HTTP(S) address for another computer. Remote servers require host access approval.</p>
+  </div>
   <div id="deeplocal-settings" hidden>
     <label for="deeplocal-url">deepLocal API base URL</label>
     <input id="deeplocal-url" value="http://127.0.0.1:14567/v1" spellcheck="false" autocomplete="off">
-    <p class="note">Packaged deepLocal apps use a dynamic port. Copy the URL from the Server page.</p>
+    <p class="note">Packaged apps may use a dynamic port. Copy the API URL from the Server page, or enter another computer's HTTP(S) API URL ending in /v1. Remote servers require host access approval.</p>
   </div>
   <div id="openai-settings" hidden>
     <label for="openai-api-key">OpenAI API key</label>
