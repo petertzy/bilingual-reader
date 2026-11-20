@@ -7,7 +7,7 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 ## Features
 
 - Translate eligible text on ordinary webpages without replacing the original content.
-- Choose between local Ollama, local deepLocal, and explicitly selected OpenAI.
+- Choose between Ollama, deepLocal, and explicitly selected OpenAI. Ollama and deepLocal can connect to local or user-configured remote HTTP(S) servers.
 - Select from **36 target-language options**, including Chinese (Simplified) and Chinese (Traditional), with English-only UI labels.
 - Use a compact extension popup; open **Settings** to choose a provider, model, and target language.
 - Keep the floating **T** tab hidden until needed; toggle it with **Command+Shift+U** on macOS (**Ctrl+Shift+U** elsewhere). Its controls offer **Translate page**, **Show translations**, **Hide translations**, and **Remove translations**. The popup and floating controls stay synchronized when translation visibility changes.
@@ -58,33 +58,39 @@ The selected-text action uses the provider, model, and target language configure
 
 ## Translation providers
 
-### Ollama (local)
+### Ollama (local or remote)
 
-1. Install and start [Ollama](https://ollama.com/).
-2. Download a model you trust, for example `ollama pull gemma3:4b`.
-3. Confirm Ollama is listening on `http://127.0.0.1:11434`.
-4. In **Settings**, select **Ollama**, click **Find local models**, and select a loaded model ID.
+1. Start [Ollama](https://ollama.com/) and download a model, for example `ollama pull gemma3:4b`.
+2. In **Settings**, select **Ollama** and enter the **Ollama API base URL**. The default remains `http://127.0.0.1:11434`.
+3. To use another computer, enter its HTTP(S) origin, for example `http://192.168.1.20:11434`. Do not append `/api/chat` or `/api/tags`.
+4. For a remote host, click **Allow provider server access** and approve Chrome's permission request.
+5. Click **Find local models**, then select a loaded model ID.
 
 Model discovery uses `GET /api/tags`; translation uses `POST /api/chat`. Model quality and language coverage vary.
 
-### deepLocal (local)
+### deepLocal (local or remote)
 
 Project: https://github.com/petertzy/deepLocal
 
 1. Start deepLocal and load a GGUF model.
-2. Copy the **API base URL** from deepLocal's **Server** page.
-3. In **Settings**, select **deepLocal** and paste the URL into **deepLocal API base URL**.
-4. Click **Find local models** and select the exact returned model ID.
+2. In **Settings**, select **deepLocal** and enter its **deepLocal API base URL**. The development default remains `http://127.0.0.1:14567/v1`.
+3. For a packaged desktop app, copy the current URL from its **Server** page, since its port may change between launches.
+4. For a remote instance, enter its reachable HTTP(S) address ending in `/v1`, for example `http://192.168.1.20:14567/v1`. The remote service must actually listen on an accessible network interface; changing the extension URL alone does not expose it.
+5. For a remote host, click **Allow provider server access** and approve Chrome's permission request. Click **Find local models** and select the returned model ID.
 
-The development default is `http://127.0.0.1:14567/v1`. Packaged desktop builds may choose a different loopback port each time they start. The extension accepts only `http://127.0.0.1:<port>/v1`; it does not scan for ports automatically. Model discovery uses `GET /v1/models`; translation uses `POST /v1/chat/completions` with `use_documents: false` and `stream: false`.
+Model discovery uses `GET /v1/models`; translation uses `POST /v1/chat/completions` with `use_documents: false` and `stream: false`.
 
-To check a development server:
+To check the development server:
 
 ```bash
 curl http://127.0.0.1:14567/v1/models
 ```
 
-Replace the port with the one shown by deepLocal. Avoid exposing local model services to the public network.
+### Remote server access and security
+
+Remote provider access is **opt-in**. The extension keeps the original loopback defaults and does not request access to other hosts until you click **Allow provider server access**. Chrome grants permissions by scheme and hostname, not by individual TCP port. The requested permission therefore covers that host's HTTP(S) origin across ports for the selected scheme. Change or revoke granted access in Chrome's extension site-access settings.
+
+The extension accepts HTTP or HTTPS provider URLs without embedded credentials, query strings, fragments, or unexpected API paths. It rejects redirects. **Prefer HTTPS for servers outside a trusted private network**: plain HTTP transmits webpage text and model responses without transport encryption. A remote server operator can access the text you submit. The extension does not configure firewall rules, bind a local model server to a network interface, or add server authentication. Do not expose an unauthenticated model API directly to the public internet.
 
 ### OpenAI (optional cloud)
 
@@ -167,7 +173,7 @@ Language names, UI, source code, comments, tests, and documentation remain Engli
 
 ## Permissions and privacy
 
-The manifest declares `activeTab`, `scripting`, `storage`, and `contextMenus`, with host permissions for `http://127.0.0.1/*` and `https://api.openai.com/*`. It does **not** request `<all_urls>`. Chrome host match patterns cannot restrict permissions to specific ports, so deepLocal addresses are additionally validated in code. Configured deepLocal URLs must use numeric `127.0.0.1`, an explicit port, and the `/v1` path. Requests reject HTTP redirects.
+The manifest declares `activeTab`, `scripting`, `storage`, and `contextMenus`, with required host permissions for `http://127.0.0.1/*` and `https://api.openai.com/*`. It additionally declares optional HTTP(S) host permissions for user-approved remote Ollama and deepLocal endpoints. Remote access is requested through the explicit **Allow provider server access** button, not silently at installation. Chrome permissions apply to a scheme and hostname across ports. Provider URL validation rejects credentials, query strings, fragments, and unexpected paths. Network requests reject HTTP redirects.
 
 - No telemetry, external script CDN, user account, or extension-managed auto-update service is implemented.
 - Local providers receive source text through services running on the same machine.
@@ -188,8 +194,9 @@ The manifest declares `activeTab`, `scripting`, `storage`, and `contextMenus`, w
 | Popup and floating controls show different visibility actions | Reload the extension and refresh the webpage. The popup reads the active tab's visibility when opened or refocused; ensure both controls refer to the same tab. |
 | Selected-text shortcut does nothing | Select text on a normal webpage and check the binding or conflicts at `chrome://extensions/shortcuts`. |
 | Selection translation fails | Confirm the configured provider is running or accessible, the selected text is within 3,500 characters, and the webpage allows extension scripts. |
-| No local models are found | Start the selected local service and load a model before clicking **Find local models**. |
-| deepLocal cannot connect | Copy the current loopback API URL from its **Server** page; the port may have changed. |
+| No models are found | Start the configured service, confirm the endpoint URL and network reachability, grant remote host access if prompted, and load a model before clicking **Find local models**. |
+| deepLocal cannot connect | Copy the current API URL from its **Server** page; the port may have changed. For a remote host, check firewall, server binding, and Chrome host permission. |
+| Ollama cannot connect to a remote server | Check the remote Ollama listener, network access, URL, and Chrome host permission. The extension cannot make a loopback-only server remotely reachable. |
 | OpenAI asks for a key after restarting | An encrypted key must be unlocked with the vault passphrase for the new session. |
 | The OpenAI API key field is empty after saving | This is intentional; check the credential status text. |
 | OpenAI translation fails with an HTTP error | Check API key validity, model access, quota, billing, and network access. Do not share secrets when reporting errors. |
