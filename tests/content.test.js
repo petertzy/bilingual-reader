@@ -36,6 +36,8 @@ function selectCandidates(elements) {
 
 function element({ text, tag = 'DIV', parent = '', children = [], visible = true, directText = null }) {
   return {
+    nodeType: 1,
+    tagName: tag,
     innerText: text,
     children,
     childNodes: [{ nodeType: 3, textContent: directText === null ? (children.length ? '' : text) : directText }],
@@ -217,4 +219,38 @@ test('normalizes whitespace across inline text and line breaks', () => {
   ]);
   const { sourceText } = inspectCandidates([]);
   assert.equal(sourceText(paragraph), 'An array of tagged instances can be injected.');
+});
+
+test('selects a short linked article heading for translation', () => {
+  const heading = element({ text: 'Binding Primitives', tag: 'H2' });
+  heading.childNodes = [domNode('A', [textNode('Binding Primitives')])];
+  const { candidates, sourceText } = inspectCandidates([heading]);
+  assert.deepEqual(candidates, [heading]);
+  assert.equal(sourceText(heading), 'Binding Primitives');
+});
+
+test('selects short semantic paragraphs, lists and accessible headings', () => {
+  const heading = element({ text: 'Quick Start', tag: 'DIV' });
+  heading.matches = selector => selector.includes('[role="heading"]');
+  const paragraph = element({ text: 'Ready.', tag: 'P' });
+  const listItem = element({ text: 'First', tag: 'LI' });
+  listItem.matches = selector => selector.includes('p, li');
+  const shortLabel = element({ text: 'Quick Start', tag: 'SPAN' });
+  const { candidates } = inspectCandidates([heading, paragraph, listItem, shortLabel]);
+  assert.deepEqual(candidates, [heading, paragraph, listItem]);
+});
+
+test('accepts one-character semantic text and rejects empty content', () => {
+  const heading = element({ text: 'A', tag: 'H3' });
+  const paragraph = element({ text: 'I', tag: 'P' });
+  const empty = element({ text: ' ', tag: 'P' });
+  assert.deepEqual(selectCandidates([heading, paragraph, empty]), [heading, paragraph]);
+});
+
+test('does not select short generic containers or interactive controls', () => {
+  const shortDiv = element({ text: 'Save', tag: 'DIV' });
+  const shortSpan = element({ text: 'Read more', tag: 'SPAN' });
+  const button = element({ text: 'Apply changes now to continue', tag: 'BUTTON', parent: 'excluded' });
+  const hidden = element({ text: 'Hidden', tag: 'P', visible: false });
+  assert.deepEqual(selectCandidates([shortDiv, shortSpan, button, hidden]), []);
 });

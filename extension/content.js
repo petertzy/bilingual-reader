@@ -67,7 +67,10 @@
         if (el.closest('#sovereign-reader-quick-tab')) return false;
         if (!el.getClientRects().length) return false;
         const text = sourceText(el);
-        if (!text || text.length < 25 || text.length > MAX_CHARS) return false;
+        // Semantic content remains eligible regardless of length. Generic
+        // containers retain a minimum to avoid translating small UI labels.
+        const semantic = el.matches(structuralText);
+        if (!text || text.length > MAX_CHARS || (!semantic && text.length < 25)) return false;
         if (!el.matches(structuralText)) {
           const childWithText = Array.from(el.children).some(child =>
             child.innerText?.trim() && !child.matches('button, [role="button"], svg, img, [aria-hidden="true"]'));
