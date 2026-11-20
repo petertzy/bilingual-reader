@@ -8,7 +8,7 @@
   const MAX_CHARS = 3500;
   const MAX_TASKS = 120;
   const MAX_SEGMENT_CHARS = 600;
-  const state = { running: false, generation: 0 };
+  const state = { running: false, generation: 0, translationsVisible: true };
   const excluded = 'script,style,noscript,textarea,input,select,option,button,code,pre,[contenteditable],nav,footer,header,[role="navigation"]';
 
   // Include headings and text-only chat bubbles without translating controls or containers twice.
@@ -107,7 +107,9 @@
   function translationNode(text) {
     const el = document.createElement('div');
     el.setAttribute(MARK, 'translation');
+    el.hidden = !state.translationsVisible;
     el.style.cssText = 'border-left:3px solid #2563eb;padding:8px 12px;margin:6px 0 16px;background:rgba(37,99,235,.06);color:inherit;white-space:pre-wrap;font:inherit;line-height:1.6;';
+    el.style.display = state.translationsVisible ? '' : 'none';
     el.textContent = text;
     return el;
   }
@@ -203,6 +205,23 @@
     }
   }
 
+  function setTranslationsVisible(visible) {
+    state.translationsVisible = visible;
+    document.querySelectorAll(`[${MARK}="translation"]`).forEach(el => {
+      el.hidden = !visible;
+      el.style.display = visible ? '' : 'none';
+    });
+    updateVisibilityButtons();
+  }
+
+  let visibilityButtons = [];
+  function updateVisibilityButtons() {
+    visibilityButtons.forEach(({ show, hide }) => {
+      show.hidden = state.translationsVisible;
+      hide.hidden = !state.translationsVisible;
+    });
+  }
+
   function clear() {
     state.generation++;
     state.running = false;
@@ -223,7 +242,7 @@
       button { font: 13px system-ui,sans-serif; cursor:pointer; }
       .tab { border:0;border-radius:8px 0 0 8px;background:#205ad7;color:white;padding:11px 9px;box-shadow:0 2px 10px #0003; }
       .panel { position:absolute;right:38px;top:0;width:190px;padding:12px;background:white;color:#18212f;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 6px 22px #0003;font:13px system-ui,sans-serif; }
-      .panel[hidden] { display:none; }
+      .panel[hidden], .panel button[hidden] { display:none!important; }
       .panel button { width:100%;margin-top:8px;border:0;border-radius:6px;padding:9px;background:#205ad7;color:white; }
       .panel button.secondary { background:#edf1f7;color:#18212f; }
       .hint { margin-top:8px;font-size:11px;color:#596579; }
@@ -246,10 +265,20 @@
     removeButton.type = 'button';
     removeButton.className = 'secondary';
     removeButton.textContent = 'Remove translations';
+    const showButton = document.createElement('button');
+    showButton.type = 'button';
+    showButton.textContent = 'Show translations';
+    const hideButton = document.createElement('button');
+    hideButton.type = 'button';
+    hideButton.textContent = 'Hide translations';
+    visibilityButtons.push({ show: showButton, hide: hideButton });
+    updateVisibilityButtons();
+    showButton.addEventListener('click', () => { setTranslationsVisible(true); panel.hidden = true; });
+    hideButton.addEventListener('click', () => { setTranslationsVisible(false); panel.hidden = true; });
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = 'Choose provider and language in extension settings.';
-    panel.append(title, translateButton, removeButton, hint);
+    panel.append(title, translateButton, showButton, hideButton, removeButton, hint);
     root.append(style, tab, panel);
     tab.addEventListener('click', () => { panel.hidden = !panel.hidden; });
     translateButton.addEventListener('click', async () => {
@@ -293,6 +322,11 @@
         target: message.target, deepLocalBaseUrl: message.deepLocalBaseUrl
       }).catch(error => console.warn('[Sovereign Bilingual] Translation run failed:', error.message));
       respond({ ok: true, started: true });
+    } else if (message?.type === 'SHOW_TRANSLATIONS' || message?.type === 'HIDE_TRANSLATIONS') {
+      setTranslationsVisible(message.type === 'SHOW_TRANSLATIONS');
+      respond({ ok: true, visible: state.translationsVisible });
+    } else if (message?.type === 'GET_TRANSLATION_VISIBILITY') {
+      respond({ ok: true, visible: state.translationsVisible });
     } else if (message?.type === 'CLEAR') {
       clear();
       respond({ ok: true });

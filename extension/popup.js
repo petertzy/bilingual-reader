@@ -326,3 +326,41 @@ chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
 
 document.getElementById('start').addEventListener('click', () => send('START'));
 document.getElementById('clear').addEventListener('click', () => send('CLEAR'));
+
+async function updateTranslationVisibility(visible) {
+  const show = document.getElementById('show-translations');
+  const hide = document.getElementById('hide-translations');
+  show.hidden = visible;
+  hide.hidden = !visible;
+}
+
+async function toggleTranslationVisibility(visible) {
+  status.textContent = '';
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) {
+      throw new Error('Open a normal website before changing translation visibility.');
+    }
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    const result = await chrome.tabs.sendMessage(tab.id, {
+      type: visible ? 'SHOW_TRANSLATIONS' : 'HIDE_TRANSLATIONS'
+    });
+    if (!result?.ok) throw new Error('The webpage did not respond.');
+    await updateTranslationVisibility(result.visible);
+    status.textContent = visible ? 'Translations shown.' : 'Translations hidden. They are still available.';
+  } catch (error) {
+    status.textContent = `Operation failed: ${error.message}`;
+  }
+}
+
+document.getElementById('show-translations').addEventListener('click', () => toggleTranslationVisibility(true));
+document.getElementById('hide-translations').addEventListener('click', () => toggleTranslationVisibility(false));
+
+chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+  if (!tab?.id || !/^https?:\/\//.test(tab.url || '')) return;
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    const result = await chrome.tabs.sendMessage(tab.id, { type: 'GET_TRANSLATION_VISIBILITY' });
+    if (result?.ok) await updateTranslationVisibility(result.visible);
+  } catch { /* Ignore restricted pages and tabs without the content script. */ }
+}).catch(() => {});
