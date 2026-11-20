@@ -23,11 +23,37 @@
       .join(' ').replace(/\s+/g, ' ').trim();
   }
 
+  // Collect paragraph text in DOM order, including words inside inline tags.
+  // Skip controls and hidden descendants without removing surrounding prose.
+  const embeddedUi = 'script,style,noscript,textarea,input,select,option,button,svg,[contenteditable],[role="button"],[role="toolbar"],[role="menu"],[role="menubar"],[role="tablist"],[role="textbox"],[aria-hidden="true"],[hidden],[inert]';
+  const blockBoundary = 'p,div,li,ul,ol,blockquote,section,article,h1,h2,h3,h4,h5,h6';
+
+  function structuralSourceText(el) {
+    const parts = [];
+    function visit(node) {
+      if (node.nodeType === 3) {
+        parts.push(node.textContent || '');
+        return;
+      }
+      if (node.nodeType !== 1) return;
+      if (node !== el && node.matches(embeddedUi)) return;
+      if (node.tagName === 'BR') {
+        parts.push(' ');
+        return;
+      }
+      const block = node !== el && node.matches(blockBoundary);
+      if (block) parts.push(' ');
+      for (const child of node.childNodes || []) visit(child);
+      if (block) parts.push(' ');
+    }
+    visit(el);
+    return parts.join('').replace(/\s+/g, ' ').trim();
+  }
+
   function sourceText(el) {
+    if (el.matches(structuralText)) return structuralSourceText(el);
     const own = directText(el);
     if (own.length >= 25) return own;
-    // Structural text can contain inline formatting without being a wrapper.
-    if (el.matches(structuralText)) return el.innerText?.trim() || '';
     // Plain chat bubbles often wrap the prompt in nested spans. Accept the
     // innermost non-interactive container with text, not the Copy toolbar.
     if (Array.from(el.children).some(child => child.innerText?.trim())) return '';
