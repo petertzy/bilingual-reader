@@ -318,3 +318,32 @@ test('translation blocks use no decorative left border', () => {
   assert.doesNotMatch(translation.style.cssText, /border-left\s*:/i);
   assert.match(translation.style.cssText, /background:/);
 });
+
+test('floating tab is hidden initially and the same command shows and hides it', () => {
+  const messages = new Map();
+  const host = { style: { display: 'none' } };
+  const document = { getElementById() { return {}; } };
+  const context = {
+    document,
+    window: { innerHeight: 800 },
+    chrome: { runtime: { onMessage: { addListener(fn) { messages.set('listener', fn); } } } },
+    Intl,
+    console
+  };
+  const instrumented = script.replace(
+    "  // A small, user-controlled tab provides translation without a persistent settings window.",
+    "  // Test-only quick-tab host.\n  globalThis.__setQuickTabHost = host => { quickTabHost = host; };\n  // A small, user-controlled tab provides translation without a persistent settings window."
+  );
+  vm.runInNewContext(instrumented, context);
+  context.__setQuickTabHost(host);
+  function toggle() {
+    let response;
+    messages.get('listener')({ type: 'TOGGLE_QUICK_TAB' }, null, result => { response = result; });
+    return response;
+  }
+  assert.equal(host.style.display, 'none');
+  assert.equal(toggle().visible, true);
+  assert.equal(host.style.display, '');
+  assert.equal(toggle().visible, false);
+  assert.equal(host.style.display, 'none');
+});
