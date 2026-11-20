@@ -108,7 +108,7 @@
     const el = document.createElement('div');
     el.setAttribute(MARK, 'translation');
     el.hidden = !state.translationsVisible;
-    el.style.cssText = 'border-left:3px solid #2563eb;padding:8px 12px;margin:6px 0 16px;background:rgba(37,99,235,.06);color:inherit;white-space:pre-wrap;font:inherit;line-height:1.6;';
+    el.style.cssText = 'padding:8px 12px;margin:6px 0 16px;background:rgba(37,99,235,.06);color:inherit;white-space:pre-wrap;font:inherit;line-height:1.6;';
     el.style.display = state.translationsVisible ? '' : 'none';
     el.textContent = text;
     return el;
