@@ -242,7 +242,7 @@
       button { font: 13px system-ui,sans-serif; cursor:pointer; }
       .tab { border:0;border-radius:8px 0 0 8px;background:#205ad7;color:white;padding:11px 9px;box-shadow:0 2px 10px #0003; }
       .panel { position:absolute;right:38px;top:0;width:190px;padding:12px;background:white;color:#18212f;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 6px 22px #0003;font:13px system-ui,sans-serif; }
-      .panel[hidden] { display:none; }
+      .panel[hidden], .panel button[hidden] { display:none!important; }
       .panel button { width:100%;margin-top:8px;border:0;border-radius:6px;padding:9px;background:#205ad7;color:white; }
       .panel button.secondary { background:#edf1f7;color:#18212f; }
       .hint { margin-top:8px;font-size:11px;color:#596579; }
