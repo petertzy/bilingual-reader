@@ -228,7 +228,7 @@ chrome.runtime.onInstalled.addListener(() => {
 async function selectedTextSettings() {
   await secureStorageReady;
   const prefs = await chrome.storage.local.get([
-    'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'target'
+    'provider', 'ollamaModel', 'deepLocalModel', 'openAiModel', 'deepLocalBaseUrl', 'ollamaBaseUrl', 'target'
   ]);
   const provider = ['ollama', 'deeplocal', 'openai'].includes(prefs.provider) ? prefs.provider : 'ollama';
   return {
