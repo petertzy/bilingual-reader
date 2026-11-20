@@ -229,6 +229,34 @@ test('selects a short linked article heading for translation', () => {
   assert.equal(sourceText(heading), 'Binding Primitives');
 });
 
+test('translates each link separately when one heading groups multiple linked titles', () => {
+  const first = element({ text: 'Writing Service Providers', tag: 'A' });
+  const second = element({ text: 'The Register Method', tag: 'A' });
+  const heading = element({
+    text: 'Writing Service Providers The Register Method',
+    tag: 'H2', children: [first, second]
+  });
+  first.parentElement = heading;
+  second.parentElement = heading;
+  heading.childNodes = [first, second];
+  first.childNodes = [textNode('Writing Service Providers')];
+  second.childNodes = [textNode('The Register Method')];
+  const { candidates, sourceText } = inspectCandidates([heading, first, second]);
+  assert.deepEqual(candidates, [first, second]);
+  assert.equal(sourceText(first), 'Writing Service Providers');
+  assert.equal(sourceText(second), 'The Register Method');
+});
+
+test('keeps a single linked heading as one translation unit', () => {
+  const link = element({ text: 'Introduction', tag: 'A' });
+  const heading = element({ text: 'Introduction', tag: 'H2', children: [link] });
+  link.parentElement = heading;
+  heading.childNodes = [link];
+  link.childNodes = [textNode('Introduction')];
+  const { candidates } = inspectCandidates([heading, link]);
+  assert.deepEqual(candidates, [heading]);
+});
+
 test('selects short semantic paragraphs, lists and accessible headings', () => {
   const heading = element({ text: 'Quick Start', tag: 'DIV' });
   heading.matches = selector => selector.includes('[role="heading"]');
