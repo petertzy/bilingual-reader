@@ -249,7 +249,12 @@
 
   // Keep the floating controls hidden until explicitly requested.
   let quickTabHost = null;
+  let lastQuickTabToggle = 0;
   function toggleQuickTab() {
+    // The browser command and the page-level fallback may fire for one keypress.
+    const now = Date.now();
+    if (now - lastQuickTabToggle < 400) return quickTabHost?.style.display !== 'none';
+    lastQuickTabToggle = now;
     if (!quickTabHost) installQuickTab();
     if (!quickTabHost) return false;
     const visible = quickTabHost.style.display === 'none';
@@ -384,6 +389,15 @@
   }
 
   installQuickTab();
+
+  // Fallback for browsers that do not dispatch the extension command shortcut.
+  document.addEventListener('keydown', event => {
+    if (event.repeat || !event.shiftKey || !event.code || event.code !== 'KeyU') return;
+    if (event.altKey || !(event.metaKey || event.ctrlKey)) return;
+    if (event.target?.closest?.('input,textarea,select,[contenteditable]')) return;
+    event.preventDefault();
+    toggleQuickTab();
+  });
 
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (message?.type === 'TOGGLE_QUICK_TAB') {
