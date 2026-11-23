@@ -8,7 +8,7 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 
 Bilingual Reader is distributed as a **signed `.crx` (CRX3) browser-extension package**, rather than a ZIP that must remain unpacked on disk.
 
-1. Visit [GitHub Releases](https://github.com/petertzy/bilingual-reader/releases) and download `bilingual-reader-v<version>.crx` under **Assets**. If there is no Release, open the [packaging workflow](https://github.com/petertzy/bilingual-reader/actions/workflows/package-extension.yml), download the `bilingual-reader-crx` artifact from a successful run, and extract the outer GitHub artifact ZIP.
+1. **Download the current CRX build:** Open the [latest successful CRX packaging run](https://github.com/petertzy/bilingual-reader/actions/runs/45222729246), find **Artifacts**, and download `bilingual-reader-crx`. Extract the GitHub artifact wrapper ZIP to obtain `bilingual-reader-v0.5.0.crx` and its `.sha256` file. **Do not use the existing `v0.5.0` GitHub Release for CRX yet:** that older Release still contains the previous ZIP package. Future releases built from the updated workflow will attach CRX files once a persistent signing key is configured.
 2. Verify the matching `.sha256` checksum if desired.
 3. Install through a **Chrome-supported distribution method**, such as Chrome Web Store publication or an administrator-configured enterprise extension policy.
 
