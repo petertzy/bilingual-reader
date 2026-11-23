@@ -6,8 +6,8 @@ Bilingual Reader is a Chrome Manifest V3 browser extension. The build now create
 
 ## Download a signed CRX
 
-1. Open [GitHub Releases](https://github.com/petertzy/bilingual-reader/releases) and select a published version. Download `bilingual-reader-v<version>.crx` from **Assets**.
-2. If no Release exists, open [GitHub Actions](https://github.com/petertzy/bilingual-reader/actions/workflows/package-extension.yml), select a successful run, and download the `bilingual-reader-crx` artifact. Extract the GitHub artifact wrapper ZIP to obtain the `.crx` and `.sha256` files.
+1. Open the [latest successful CRX build](https://github.com/petertzy/bilingual-reader/actions/runs/45222729246) or the [CRX packaging workflow](https://github.com/petertzy/bilingual-reader/actions/workflows/package-extension.yml). Download the `bilingual-reader-crx` artifact under **Artifacts** and extract GitHub's outer artifact ZIP to obtain the `.crx` and `.sha256` files.
+2. **Release status:** The existing `v0.5.0` GitHub Release was published before the CRX workflow and still contains a ZIP, not a CRX. Do not mistake it for the current CRX download. Future version-tag builds publish CRX assets after the maintainer configures a persistent signing key.
 3. Verify the checksum if desired. A valid CRX does not guarantee that your Chrome installation permits sideloading it.
 4. Use a Chrome-supported distribution method: Chrome Web Store or your organization's managed extension deployment. A local CRX is not a universal double-click installer.
 
