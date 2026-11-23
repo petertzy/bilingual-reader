@@ -1,4 +1,4 @@
-name: Package Chrome extension
+name: Package signed CRX3 extension
 
 on:
   pull_request:
@@ -27,23 +27,47 @@ jobs:
       - name: Run extension tests
         run: node --test tests/*.test.js
 
-      - name: Run package tests
+      - name: Run CRX packaging tests
         run: python3 -m unittest discover -s tests -p "test_package_extension.py" -v
 
-      - name: Create extension ZIP and checksum
-        run: python3 scripts/package_extension.py
+      - name: Restore stable signing key when configured
+        env:
+          CRX_SIGNING_KEY_PEM: ${{ secrets.CRX_SIGNING_KEY_PEM }}
+        run: |
+          if [ -n "$CRX_SIGNING_KEY_PEM" ]; then
+            printf '%s\n' "$CRX_SIGNING_KEY_PEM" > "$RUNNER_TEMP/extension-signing-key.pem"
+            chmod 600 "$RUNNER_TEMP/extension-signing-key.pem"
+            echo "CRX_KEY_PATH=$RUNNER_TEMP/extension-signing-key.pem" >> "$GITHUB_ENV"
+            echo "CRX_KEY_PERSISTENT=true" >> "$GITHUB_ENV"
+          else
+            echo "CRX_KEY_PATH=$RUNNER_TEMP/extension-signing-key.pem" >> "$GITHUB_ENV"
+            echo "CRX_KEY_PERSISTENT=false" >> "$GITHUB_ENV"
+            echo "::warning::CRX_SIGNING_KEY_PEM is not configured. A temporary key will be generated; the extension ID will change between builds."
+          fi
 
-      - name: Verify checksum
+      - name: Require stable key for release tags
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [ "$CRX_KEY_PERSISTENT" != "true" ]; then
+            echo "::error::Configure CRX_SIGNING_KEY_PEM before publishing a release."
+            exit 1
+          fi
+
+      - name: Build signed CRX3 and checksum
+        run: python3 scripts/package_extension.py --key "$CRX_KEY_PATH"
+
+      - name: Verify checksum and CRX3 magic
         run: |
           cd dist
           sha256sum --check ./*.sha256
+          python3 -c 'from pathlib import Path; import struct; p=next(Path(".").glob("*.crx")); d=p.read_bytes(); assert d[:4] == b"Cr24" and struct.unpack_from("<I", d, 4)[0] == 3'
 
-      - name: Upload downloadable extension ZIP
+      - name: Upload signed CRX3 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bilingual-reader-extension
+          name: bilingual-reader-crx
           path: |
-            dist/*.zip
+            dist/*.crx
             dist/*.sha256
           if-no-files-found: error
           retention-days: 30
@@ -58,10 +82,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Download tested package
+      - name: Download tested CRX
         uses: actions/download-artifact@v4
         with:
-          name: bilingual-reader-extension
+          name: bilingual-reader-crx
           path: dist
 
       - name: Confirm release tag matches extension version
@@ -70,13 +94,13 @@ jobs:
           test "$GITHUB_REF_NAME" = "v$version"
           (cd dist && sha256sum --check ./*.sha256)
 
-      - name: Publish package to GitHub Releases
+      - name: Publish signed CRX3 to GitHub Releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 --clobber
+            gh release upload "$GITHUB_REF_NAME" dist/*.crx dist/*.sha256 --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 \
+            gh release create "$GITHUB_REF_NAME" dist/*.crx dist/*.sha256 \
               --verify-tag --title "Bilingual Reader $GITHUB_REF_NAME" --generate-notes
           fi
