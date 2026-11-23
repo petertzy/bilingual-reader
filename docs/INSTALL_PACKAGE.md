@@ -1,12 +1,88 @@
-# Install a packaged Bilingual Reader extension
+# Signed CRX3 packages and installation
 
-Bilingual Reader is a Chrome Manifest V3 browser extension, not a Windows or macOS desktop application. It does not produce an `.exe`, `.msi`, or `.app`. The downloadable distribution is a versioned ZIP archive containing the complete browser extension.
+Bilingual Reader is a Chrome Manifest V3 browser extension. The build now creates a **signed CRX3** file (`.crx`), not an unpacked-installation ZIP. A CRX is a single extension package and does not need its original source directory after a successful managed installation.
 
-## Publish version 0.5.0 (maintainers)
+**Important limitation:** A self-signed CRX downloaded from GitHub is **not guaranteed to install in regular Google Chrome on macOS or Windows**. Chrome may reject it because it lacks Chrome Web Store authorization. Renaming files, dragging a CRX into `chrome://extensions`, enabling Developer mode, or passing undocumented flags does not reliably override Chrome's distribution policy. Do not disable browser security features to work around this. For a normal consumer installation that survives deletion of downloads, publish through the Chrome Web Store. For organizational deployments, use supported Chrome Enterprise extension policies on properly managed devices.
 
-The workflow creates a GitHub Release **only when a version tag is pushed**. Merging a pull request or committing to `main` creates a downloadable Actions artifact, but does not create a release.
+## Download a signed CRX
 
-To publish `v0.5.0` from the current `main` branch:
+1. Open [GitHub Releases](https://github.com/petertzy/bilingual-reader/releases) and select a published version. Download `bilingual-reader-v<version>.crx` from **Assets**.
+2. If no Release exists, open [GitHub Actions](https://github.com/petertzy/bilingual-reader/actions/workflows/package-extension.yml), select a successful run, and download the `bilingual-reader-crx` artifact. Extract the GitHub artifact wrapper ZIP to obtain the `.crx` and `.sha256` files.
+3. Verify the checksum if desired. A valid CRX does not guarantee that your Chrome installation permits sideloading it.
+4. Use a Chrome-supported distribution method: Chrome Web Store or your organization's managed extension deployment. A local CRX is not a universal double-click installer.
+
+The CRX does not bundle an LLM. Start Ollama or deepLocal, or configure OpenAI separately.
+
+## Create a CRX locally
+
+Requires Python 3 and OpenSSL in your PATH. From the repository root:
+
+```bash
+python3 scripts/package_extension.py
+```
+
+Windows with Python Launcher:
+
+```powershell
+py -3 scripts/package_extension.py
+```
+
+The script produces:
+
+```text
+dist/
+  bilingual-reader-v0.5.0.crx
+  bilingual-reader-v0.5.0.sha256
+  extension-signing-key.pem
+```
+
+**Keep `extension-signing-key.pem` private and back it up securely.** It is generated only on the first run and reused on subsequent runs to preserve the extension ID. Do not commit, upload, or share it. The `.gitignore` excludes `.pem` files and `dist/`. Losing the key means subsequent builds will have a different extension ID.
+
+To use an existing signing key:
+
+```bash
+python3 scripts/package_extension.py --key /secure/location/extension-signing-key.pem
+```
+
+The package contains only runtime extension files, with `manifest.json` at the CRX payload root. The builder checks required files, rejects symlinks, signs the CRX3 payload using RSA/SHA-256, and writes a checksum.
+
+## Verify the download
+
+On macOS:
+
+```bash
+shasum -a 256 bilingual-reader-v0.5.0.crx
+```
+
+On Linux:
+
+```bash
+sha256sum bilingual-reader-v0.5.0.crx
+```
+
+On Windows PowerShell:
+
+```powershell
+Get-FileHash .\bilingual-reader-v0.5.0.crx -Algorithm SHA256
+```
+
+Compare the result with the corresponding `.sha256` file.
+
+## Configure GitHub Actions signing
+
+The workflow is [`.github/workflows/package-extension.yml`](../.github/workflows/package-extension.yml). For repeatable releases with a stable extension ID:
+
+1. Generate and securely back up a signing key locally using the command above.
+2. In GitHub, open **Settings > Secrets and variables > Actions > New repository secret**.
+3. Create `CRX_SIGNING_KEY_PEM` and paste the **complete PEM private key**, including the BEGIN/END lines.
+4. Trigger a new packaging run. It uses the secret to sign CRX files with the same extension identity.
+5. Do not rotate the key casually. If it is compromised, follow a deliberate extension identity and migration plan.
+
+Without the secret, pull requests and branch builds use a **temporary signing key**. Their CRX artifacts are for inspection and testing only; their extension IDs change between runs. **Release-tag builds intentionally fail without the persistent signing secret**, rather than silently publishing a package with a different identity. Private keys are never included in uploaded artifacts.
+
+## Publish a version
+
+Ensure the version in `extension/manifest.json` matches the tag, and that `CRX_SIGNING_KEY_PEM` is configured. For version `0.5.0`:
 
 ```bash
 git checkout main
@@ -15,82 +91,12 @@ git tag v0.5.0
 git push origin v0.5.0
 ```
 
-Then open [GitHub Actions](https://github.com/petertzy/bilingual-reader/actions/workflows/package-extension.yml) and wait for the tagged run to pass. The **release** job uploads `bilingual-reader-v0.5.0.zip` and `bilingual-reader-v0.5.0.sha256` to [GitHub Releases](https://github.com/petertzy/bilingual-reader/releases). Verify that both files are visible before announcing the release.
+Only create a tag if it does not already exist. A successful tagged workflow publishes `bilingual-reader-v0.5.0.crx` and its SHA-256 checksum to [GitHub Releases](https://github.com/petertzy/bilingual-reader/releases). Check the workflow and Release page before announcing it. Do not force-move an existing release tag.
 
-If `v0.5.0` already exists, do not recreate or force-move it. Use a new version in `extension/manifest.json` and a matching new tag.
+## Supported installation paths
 
-## Download a prebuilt ZIP
+- **Regular Chrome on macOS/Windows:** Chrome Web Store is the supported consumer distribution route. A GitHub-hosted CRX may be rejected.
+- **Managed Chrome devices:** Administrators can configure extension installation policies and approved hosting/update URLs. Follow [Google Chrome Enterprise documentation](https://support.google.com/chrome/a/answer/7532015?hl=en); deployment prerequisites vary by platform and management environment.
+- **Development:** `chrome://extensions` > Developer mode > Load unpacked still works with the source `extension/` directory, but this is not a permanent installed-copy workflow. The source folder must remain in place.
 
-1. Open the repository's **Actions** tab and select **Package Chrome extension**.
-2. Open a successful workflow run for the desired branch or commit.
-3. Download the **bilingual-reader-extension** artifact. GitHub may wrap the two files in an additional artifact ZIP.
-4. Extract the artifact download if necessary. Locate `bilingual-reader-v<version>.zip` and its matching `.sha256` file.
-5. Extract `bilingual-reader-v<version>.zip`. It contains the `bilingual-reader-extension/` folder, with `manifest.json` directly inside.
-
-For tagged versions published by the maintainer, download the ZIP and checksum directly from the repository's **Releases** page instead.
-
-## Install in Chrome
-
-1. Open `chrome://extensions`.
-2. Enable **Developer mode**.
-3. Select **Load unpacked**.
-4. Choose the extracted **bilingual-reader-extension** folder (the one containing `manifest.json`).
-5. Pin the extension from the toolbar if desired. Open an ordinary HTTP(S) webpage, select the extension, and configure your translation provider.
-
-**Do not point Load unpacked at the ZIP itself.** Chrome requires an extracted directory for this installation method. Chrome also restricts self-hosted CRX installation on ordinary Windows and macOS installations; a `.crx` is not a substitute for a one-click native installer. For one-click Chrome installation, publish through the Chrome Web Store.
-
-This release ZIP does not contain an LLM or a model runtime. Use Ollama, deepLocal, or an explicitly configured OpenAI API endpoint as described in the main README.
-
-## Update an existing unpacked installation
-
-Extract the new version into the **same installed directory path** as the existing `bilingual-reader-extension` folder, replacing the previous extension files. Keeping the extension path stable helps avoid accidental duplicate installations and changes to local extension identity. Reload it in `chrome://extensions` and refresh any open webpages. Review the new version's permissions before installing.
-
-## Verify the download
-
-The package builder writes a SHA-256 checksum beside the ZIP.
-
-On macOS:
-
-```bash
-shasum -a 256 bilingual-reader-v0.5.0.zip
-```
-
-On Linux:
-
-```bash
-sha256sum bilingual-reader-v0.5.0.zip
-```
-
-On Windows PowerShell:
-
-```powershell
-Get-FileHash .\bilingual-reader-v0.5.0.zip -Algorithm SHA256
-```
-
-Replace `0.5.0` with the version you downloaded and compare the hash against the matching `.sha256` file. The checksum detects accidental changes to the package, but it is not a substitute for trusting the publisher.
-
-## Build locally
-
-Python 3 is sufficient; no Python packages, Node build tools, or Chrome binary are required to create the archive:
-
-```bash
-python3 scripts/package_extension.py
-```
-
-The command creates `dist/bilingual-reader-v<version>.zip` and `dist/bilingual-reader-v<version>.sha256`. The script includes only permitted static extension resources, validates the manifest and required files, rejects symlinks, excludes private keys and other non-extension files, and writes ZIP entries in deterministic order.
-
-To validate the source before building:
-
-```bash
-node --test tests/*.test.js
-python3 -m unittest discover -s tests -p "test_package_extension.py" -v
-python3 scripts/package_extension.py
-```
-
-## Automated release packaging
-
-The **Package Chrome extension** GitHub Actions workflow runs for pull requests targeting `main`, commits pushed to `main`, manual runs, and version tags. It checks JavaScript syntax, runs tests, generates the ZIP and checksum, verifies the checksum, and uploads the result as a downloadable workflow artifact.
-
-When the maintainer pushes a tag such as `v0.5.0`, matching the extension version in `extension/manifest.json`, the workflow also attaches the validated ZIP and checksum to a GitHub Release. Creating a PR or running the workflow manually does **not** publish a release.
-
-This is not code signing or a Chrome Web Store submission. No private signing key is required or bundled.
+A CRX is not a native `.exe` or `.app`, and generating one does not override Chrome's installation rules.
