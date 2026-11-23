@@ -2,6 +2,23 @@
 
 Bilingual Reader is a Chrome Manifest V3 browser extension, not a Windows or macOS desktop application. It does not produce an `.exe`, `.msi`, or `.app`. The downloadable distribution is a versioned ZIP archive containing the complete browser extension.
 
+## Publish version 0.5.0 (maintainers)
+
+The workflow creates a GitHub Release **only when a version tag is pushed**. Merging a pull request or committing to `main` creates a downloadable Actions artifact, but does not create a release.
+
+To publish `v0.5.0` from the current `main` branch:
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git tag v0.5.0
+git push origin v0.5.0
+```
+
+Then open [GitHub Actions](https://github.com/petertzy/bilingual-reader/actions/workflows/package-extension.yml) and wait for the tagged run to pass. The **release** job uploads `bilingual-reader-v0.5.0.zip` and `bilingual-reader-v0.5.0.sha256` to [GitHub Releases](https://github.com/petertzy/bilingual-reader/releases). Verify that both files are visible before announcing the release.
+
+If `v0.5.0` already exists, do not recreate or force-move it. Use a new version in `extension/manifest.json` and a matching new tag.
+
 ## Download a prebuilt ZIP
 
 1. Open the repository's **Actions** tab and select **Package Chrome extension**.
