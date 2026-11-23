@@ -1,0 +1,82 @@
+name: Package Chrome extension
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Check JavaScript syntax
+        run: |
+          for file in extension/*.js; do
+            node --check "$file"
+          done
+
+      - name: Run extension tests
+        run: node --test tests/*.test.js
+
+      - name: Run package tests
+        run: python3 -m unittest discover -s tests -p "test_package_extension.py" -v
+
+      - name: Create extension ZIP and checksum
+        run: python3 scripts/package_extension.py
+
+      - name: Verify checksum
+        run: |
+          cd dist
+          sha256sum --check ./*.sha256
+
+      - name: Upload downloadable extension ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: bilingual-reader-extension
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download tested package
+        uses: actions/download-artifact@v4
+        with:
+          name: bilingual-reader-extension
+          path: dist
+
+      - name: Confirm release tag matches extension version
+        run: |
+          version="$(python3 -c 'import json; print(json.load(open("extension/manifest.json", encoding="utf-8"))["version"])')"
+          test "$GITHUB_REF_NAME" = "v$version"
+          (cd dist && sha256sum --check ./*.sha256)
+
+      - name: Publish package to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 \
+              --verify-tag --title "Bilingual Reader $GITHUB_REF_NAME" --generate-notes
+          fi

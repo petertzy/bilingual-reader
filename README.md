@@ -15,6 +15,18 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 - Process text progressively, prioritizing blocks near the reading viewport. Translation errors appear beside affected text.
 - Optionally encrypt a remembered OpenAI API key using a passphrase-protected vault.
 
+## Download a packaged extension
+
+Bilingual Reader is a **Chrome browser extension**, not a standalone `.exe` or `.app`. The repository now supports reproducible ZIP packages for Windows, macOS, and Linux Chrome installations. You do not need a Git checkout or programming tools to use a downloaded ZIP.
+
+- **Prebuilt ZIP:** Open **Actions > Package Chrome extension**, choose a successful run, and download the **bilingual-reader-extension** artifact. If GitHub provides an outer ZIP, extract that first.
+- **Versioned releases:** Maintainer-created version tags matching `extension/manifest.json` automatically publish the extension ZIP and SHA-256 checksum to **GitHub Releases**.
+- **Local build:** Run `python3 scripts/package_extension.py` to produce the ZIP and checksum in `dist/` with no additional Python dependencies.
+
+Extract the versioned extension ZIP, then use **Load unpacked** in `chrome://extensions` and select the contained `bilingual-reader-extension` directory. Chrome on Windows and macOS does not generally permit one-click installation of privately distributed CRX packages; Chrome Web Store publication is the standard route for that experience.
+
+For downloads, checksums, updates, release automation, and complete installation steps, see [Packaged extension installation](docs/INSTALL_PACKAGE.md).
+
 ## Install in Chrome
 
 1. Download or clone this repository.
