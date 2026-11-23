@@ -25,7 +25,7 @@ def package_extension(repository: Path, output_dir: Path) -> tuple[Path, Path]:
         raise ValueError("A regular extension/manifest.json file is required.")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     version = manifest.get("version")
-    if manifest.get("manifest_version") != 3 or not isinstance(version, str) or not re.fullmatch(r"\\d+(?:\\.\\d+){1,3}", version):
+    if manifest.get("manifest_version") != 3 or not isinstance(version, str) or not re.fullmatch(r"\d+(?:\.\d+){1,3}", version):
         raise ValueError("Expected a Manifest V3 extension with a numeric version.")
 
     files = {}
@@ -63,7 +63,7 @@ def package_extension(repository: Path, output_dir: Path) -> tuple[Path, Path]:
 
     digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
     checksum_path = destination / f"{package_name}.sha256"
-    checksum_path.write_text(f"{digest}  {zip_path.name}\\n", encoding="ascii")
+    checksum_path.write_text(f"{digest}  {zip_path.name}\n", encoding="ascii")
     return zip_path, checksum_path
 
 
