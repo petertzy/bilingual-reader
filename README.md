@@ -4,19 +4,29 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 
 ![Bilingual Reader screenshot](https://github.com/user-attachments/assets/62dc0420-c891-47f5-9428-decff17d0d36)
 
-## Download a signed CRX3 extension
+## Quick install: download and load in Chrome
 
-Bilingual Reader is distributed as a **signed `.crx` (CRX3) browser-extension package**, rather than a ZIP that must remain unpacked on disk.
+**For most users, no Git, Python, or command line is needed.**
 
-1. **Download the current CRX build:** Open the [latest successful CRX packaging run](https://github.com/petertzy/bilingual-reader/actions/runs/45222729246), find **Artifacts**, and download `bilingual-reader-crx`. Extract the GitHub artifact wrapper ZIP to obtain `bilingual-reader-v0.5.0.crx` and its `.sha256` file. **Do not use the existing `v0.5.0` GitHub Release for CRX yet:** that older Release still contains the previous ZIP package. Future releases built from the updated workflow will attach CRX files once a persistent signing key is configured.
-2. Verify the matching `.sha256` checksum if desired.
-3. Install through a **Chrome-supported distribution method**, such as Chrome Web Store publication or an administrator-configured enterprise extension policy.
+1. Open the [Releases page](https://github.com/petertzy/bilingual-reader/releases) and choose the latest version.
+2. Under **Assets**, download `bilingual-reader-v0.5.0.zip` (or the ZIP for the current version). If no release is available yet, download the `bilingual-reader-extension` artifact from the [latest successful packaging workflow](https://github.com/petertzy/bilingual-reader/actions/workflows/package-extension.yml) and extract its outer ZIP first.
+3. Extract the downloaded versioned ZIP. Keep the resulting `bilingual-reader-extension` folder in a permanent location.
+4. Open `chrome://extensions` in Chrome and turn on **Developer mode**.
+5. Click **Load unpacked** and select the extracted `bilingual-reader-extension` folder containing `manifest.json`.
+6. Pin **Sovereign Bilingual Reader** to the toolbar, open a normal webpage, and select **Settings** to configure Ollama, deepLocal, or OpenAI.
 
-**Important:** Standard Google Chrome on macOS and Windows can reject self-hosted CRX files, even with Developer mode enabled. A GitHub CRX is **not** a guaranteed drag-and-drop or double-click installer. Changing Chrome security settings or using unofficial force-install flags is not a reliable solution. A Chrome Web Store listing is the recommended consumer installation path. A successful managed installation does not require retaining the downloaded CRX.
+**Important:** The ZIP is not a double-click installer. Do not select the ZIP itself in Chrome. Keep the extracted folder in place after installation; moving or deleting it breaks the unpacked extension. The ZIP contains the browser extension only, not an AI model or model server.
 
-**Build locally:** Run `python3 scripts/package_extension.py` (or `py -3 scripts/package_extension.py` on Windows) with Python 3 and OpenSSL installed. This creates `dist/bilingual-reader-v<version>.crx` and a checksum. The first run also creates a private signing key in `dist/`; back it up securely and never commit it. Reuse the same key to preserve the extension ID across versions.
+**Maintainers:** To publish version `0.5.0` after merging the desired changes into `main`, create and push the matching `v0.5.0` tag. The [packaging workflow](.github/workflows/package-extension.yml) will validate the extension and upload its ZIP and checksum to GitHub Releases. For example, with Git installed:
 
-**Maintainers:** Set the GitHub Actions secret `CRX_SIGNING_KEY_PEM` to the complete private key before publishing a tagged Release. Without it, CI builds use temporary signing keys and tagged releases fail deliberately. See the [complete CRX build and installation guide](docs/INSTALL_PACKAGE.md).
+```bash
+git checkout main
+git pull --ff-only origin main
+git tag v0.5.0
+git push origin v0.5.0
+```
+
+Do not reuse an existing release tag. The tag must match `extension/manifest.json` exactly. See [packaged installation and release instructions](docs/INSTALL_PACKAGE.md) for details.
 
 ## Features
 
@@ -29,11 +39,28 @@ Bilingual Reader is distributed as a **signed `.crx` (CRX3) browser-extension pa
 - Process text progressively, prioritizing blocks near the reading viewport. Translation errors appear beside affected text.
 - Optionally encrypt a remembered OpenAI API key using a passphrase-protected vault.
 
-## Development installation
+## Download a packaged extension
 
-For local development only, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select the repository's `extension/` directory. **Keep that directory on disk** while using the unpacked extension. This is not the installed-copy workflow requested for end users.
+Bilingual Reader is a **Chrome browser extension**, not a standalone `.exe` or `.app`. The repository now supports reproducible ZIP packages for Windows, macOS, and Linux Chrome installations. You do not need a Git checkout or programming tools to use a downloaded ZIP.
 
-For signed CRX distribution and Chrome installation restrictions, see [CRX build and installation](docs/INSTALL_PACKAGE.md).
+- **Prebuilt ZIP:** Open **Actions > Package Chrome extension**, choose a successful run, and download the **bilingual-reader-extension** artifact. If GitHub provides an outer ZIP, extract that first.
+- **Versioned releases:** Maintainer-created version tags matching `extension/manifest.json` automatically publish the extension ZIP and SHA-256 checksum to **GitHub Releases**.
+- **Local build:** Run `python3 scripts/package_extension.py` to produce the ZIP and checksum in `dist/` with no additional Python dependencies.
+
+Extract the versioned extension ZIP, then use **Load unpacked** in `chrome://extensions` and select the contained `bilingual-reader-extension` directory. Chrome on Windows and macOS does not generally permit one-click installation of privately distributed CRX packages; Chrome Web Store publication is the standard route for that experience.
+
+For downloads, checksums, updates, release automation, and complete installation steps, see [Packaged extension installation](docs/INSTALL_PACKAGE.md).
+
+## Install in Chrome
+
+1. Download or clone this repository.
+2. Open `chrome://extensions` and enable **Developer mode**.
+3. Click **Load unpacked** and select this repository's `extension/` directory.
+4. Open a normal `http://` or `https://` webpage and click the extension icon.
+5. Click **Settings**, select a provider and model, choose a **Target language**, then click **Translate page**.
+6. Use **Hide translations** to practice reading without translations, **Show translations** to restore them, or **Remove translations** to discard them.
+
+After pulling updates, reload the extension from `chrome://extensions` and refresh the webpage. The extension does not run automatically on every visited page. Opening its popup on a normal webpage prepares the floating **T** tab, but it remains hidden until the user presses the tab-toggle shortcut.
 
 ## Reading and translation controls
 
