@@ -47,10 +47,10 @@ class PackageExtensionTests(unittest.TestCase):
         with ZipFile(package) as archive:
             names = archive.namelist()
             self.assertEqual(len(names), 6)
-            self.assertIn("bilingual-reader-v0.5.0/manifest.json", names)
-            self.assertIn("bilingual-reader-v0.5.0/assets/icon.png", names)
-            self.assertNotIn("bilingual-reader-v0.5.0/private.pem", names)
-            self.assertEqual(json.loads(archive.read("bilingual-reader-v0.5.0/manifest.json"))["version"], "0.5.0")
+            self.assertIn("bilingual-reader-extension/manifest.json", names)
+            self.assertIn("bilingual-reader-extension/assets/icon.png", names)
+            self.assertNotIn("bilingual-reader-extension/private.pem", names)
+            self.assertEqual(json.loads(archive.read("bilingual-reader-extension/manifest.json"))["version"], "0.5.0")
         digest = hashlib.sha256(package.read_bytes()).hexdigest()
         self.assertEqual(checksum.read_text(encoding="ascii"), f"{digest}  {package.name}\n")
 
@@ -84,9 +84,8 @@ class PackageExtensionTests(unittest.TestCase):
     def test_real_repository_extension_packages(self) -> None:
         package, _ = package_extension(ROOT, self.root / "actual")
         with ZipFile(package) as archive:
-            root = package.stem
-            self.assertIn(f"{root}/manifest.json", archive.namelist())
-            self.assertIn(f"{root}/content.js", archive.namelist())
+            self.assertIn("bilingual-reader-extension/manifest.json", archive.namelist())
+            self.assertIn("bilingual-reader-extension/content.js", archive.namelist())
 
 
 if __name__ == "__main__":
