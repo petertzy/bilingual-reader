@@ -4,6 +4,30 @@ A compact, local-first Chrome Manifest V3 extension for on-demand bilingual webp
 
 ![Bilingual Reader screenshot](https://github.com/user-attachments/assets/62dc0420-c891-47f5-9428-decff17d0d36)
 
+## Quick install: download and load in Chrome
+
+**For most users, no Git, Python, or command line is needed.**
+
+1. Open the [Releases page](https://github.com/petertzy/bilingual-reader/releases) and choose the latest version.
+2. Under **Assets**, download `bilingual-reader-v0.5.0.zip` (or the ZIP for the current version). If no release is available yet, download the `bilingual-reader-extension` artifact from the [latest successful packaging workflow](https://github.com/petertzy/bilingual-reader/actions/workflows/package-extension.yml) and extract its outer ZIP first.
+3. Extract the downloaded versioned ZIP. Keep the resulting `bilingual-reader-extension` folder in a permanent location.
+4. Open `chrome://extensions` in Chrome and turn on **Developer mode**.
+5. Click **Load unpacked** and select the extracted `bilingual-reader-extension` folder containing `manifest.json`.
+6. Pin **Sovereign Bilingual Reader** to the toolbar, open a normal webpage, and select **Settings** to configure Ollama, deepLocal, or OpenAI.
+
+**Important:** The ZIP is not a double-click installer. Do not select the ZIP itself in Chrome. Keep the extracted folder in place after installation; moving or deleting it breaks the unpacked extension. The ZIP contains the browser extension only, not an AI model or model server.
+
+**Maintainers:** To publish version `0.5.0` after merging the desired changes into `main`, create and push the matching `v0.5.0` tag. The [packaging workflow](.github/workflows/package-extension.yml) will validate the extension and upload its ZIP and checksum to GitHub Releases. For example, with Git installed:
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git tag v0.5.0
+git push origin v0.5.0
+```
+
+Do not reuse an existing release tag. The tag must match `extension/manifest.json` exactly. See [packaged installation and release instructions](docs/INSTALL_PACKAGE.md) for details.
+
 ## Features
 
 - Translate eligible text on ordinary webpages without replacing the original content. When one heading groups multiple links, translate each linked title separately instead of combining them into one model request.
