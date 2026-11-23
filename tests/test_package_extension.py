@@ -50,9 +50,9 @@ class PackageExtensionTests(unittest.TestCase):
             self.assertIn("bilingual-reader-v0.5.0/manifest.json", names)
             self.assertIn("bilingual-reader-v0.5.0/assets/icon.png", names)
             self.assertNotIn("bilingual-reader-v0.5.0/private.pem", names)
-            self.assertEqual(json.loads(archive.read(names[0]) if names[0].endswith("manifest.json") else archive.read("bilingual-reader-v0.5.0/manifest.json"))["version"], "0.5.0")
+            self.assertEqual(json.loads(archive.read("bilingual-reader-v0.5.0/manifest.json"))["version"], "0.5.0")
         digest = hashlib.sha256(package.read_bytes()).hexdigest()
-        self.assertEqual(checksum.read_text(encoding="ascii"), f"{digest}  {package.name}\\n")
+        self.assertEqual(checksum.read_text(encoding="ascii"), f"{digest}  {package.name}\n")
 
     def test_archives_are_deterministic(self) -> None:
         first, _ = package_extension(self.repo, self.root / "first")
