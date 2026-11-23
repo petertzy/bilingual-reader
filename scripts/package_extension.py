@@ -53,10 +53,11 @@ def package_extension(repository: Path, output_dir: Path) -> tuple[Path, Path]:
     destination.mkdir(parents=True, exist_ok=True)
 
     package_name = f"bilingual-reader-v{version}"
+    install_folder = "bilingual-reader-extension"
     zip_path = destination / f"{package_name}.zip"
     with ZipFile(zip_path, "w", compression=ZIP_DEFLATED, compresslevel=9) as archive:
         for relative, path in sorted(files.items()):
-            info = ZipInfo(f"{package_name}/{relative}", date_time=ZIP_TIMESTAMP)
+            info = ZipInfo(f"{install_folder}/{relative}", date_time=ZIP_TIMESTAMP)
             info.compress_type = ZIP_DEFLATED
             info.external_attr = 0o100644 << 16
             archive.writestr(info, path.read_bytes(), compress_type=ZIP_DEFLATED, compresslevel=9)
